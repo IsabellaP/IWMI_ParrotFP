@@ -29,8 +29,48 @@ auth_header = {'Authorization': 'Bearer {token}'.format(token=access_token)}
 
 # Set your own authentication token
 req = requests.get('https://apiflowerpower.parrot.com/user/v4/profile',
-                   headers={'Authorization': 'Bearer YOUR_ACCESS_TOKEN_'})
+                   headers={'Authorization': 
+                            'Bearer {token}'.format(token=access_token)})
 
+
+response = req.json()
+print('Server response: \n {0}'.format(pformat(response)))
+
+# Set your own authentication token
+req = requests.get('https://apiflowerpower.parrot.com/user/v1/versions',
+                   headers={'Authorization': 
+                            'Bearer {token}'.format(token=access_token)})
+
+
+response = req.json()
+print('Server response: \n {0}'.format(pformat(response)))
+
+
+location_identifier = 'eg9dnEtyHy589153XXX'
+
+# Set your own authentication token
+req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v2/sample/location/' 
+                   + location_identifier,
+                   headers={'Authorization': 
+                            'Bearer {token}'.format(token=access_token)})
+    #params={'from_datetime_utc': '2016-06-18T14:42:42Z',
+     #       'to_datetime_utc': '2016-06-19T06:30:00Z'})
+
+response = req.json()
+print('Server response: \n {0}'.format(pformat(response)))
+
+# Set your own authentication token
+req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v3/sync',
+                        headers={'Authorization':
+                            'Bearer {token}'.format(token=access_token)})
+
+response = req.json()
+print('Server response: \n {0}'.format(pformat(response)))
+
+# Set your own authentication token
+req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v4/garden_locations_status',
+                   headers={'Authorization': 
+                            'Bearer {token}'.format(token=access_token)})
 
 response = req.json()
 print('Server response: \n {0}'.format(pformat(response)))
