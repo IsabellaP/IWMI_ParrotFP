@@ -51,6 +51,10 @@ def get_FP_data(plant, start_date, end_date, print_results=True):
         location_identifier = 'vTPyGmPsbl1466103276199'
     elif plant == 'dieffenbacchia':
         location_identifier = 'LBFxUGtLcT1465927113542'
+    elif plant == 'petzenkirchen':
+        location_identifier = 'Y3QjXXEQmN1466537309325'
+    elif plant == 'erdbeeren2':
+        location_identifier = 'Enww4lXuIL1466518968168'
     
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v2/sample/location/' 
@@ -117,22 +121,25 @@ def FPdata2df(samples, path_out):
                       columns=['vwc_percent', 'air_temperature_celsius',
                                'par_umole_m2s'])
     
-    df.to_csv(path_out)
+    print df
+    #df.to_csv(path_out)
 
 
 if __name__ == '__main__':
     
-    plant = 'erdbeeren'
-    start_date = '2016-06-18T00:00:00Z'
-    end_date = '2016-06-21T00:00:00Z'
-    print_results = True
+    plants = ['erdbeeren', 'erdbeeren2']
+    # add 2 to get UTC+2
+    start_date = '2016-06-22T03:00:00Z'
+    end_date = '2016-06-22T14:00:00Z'
+    print_results = False
     
-    response, user, versions, samples, \
-                    plants, garden = get_FP_data(plant, start_date,
-                                                 end_date, print_results)
-    timestamp = datetime.now()
-    path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
-    FPdata2df(samples, path_out)
+    for plant in plants:
+        print plant
+        response, user, versions, samples, \
+                        plants, garden = get_FP_data(plant, start_date,
+                                                     end_date, print_results)
+        timestamp = datetime.now()
+        path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
+        FPdata2df(samples, path_out)
     
     print 'Finished'
-    
