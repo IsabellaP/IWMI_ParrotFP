@@ -5,6 +5,7 @@ from pprint import pformat  # here only for aesthetic
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 
 def get_FP_data(plant, start_date, end_date, print_results=True):
@@ -98,7 +99,7 @@ def get_FP_data(plant, start_date, end_date, print_results=True):
     return response, user, versions, samples, plants, garden
 
 
-def FPdata2df(samples, path_out):
+def FPdata2df(samples, path_out=None):
     
     # ignore fertilizer for now
     FP_data = samples['samples']
@@ -122,7 +123,23 @@ def FPdata2df(samples, path_out):
                                'par_umole_m2s'])
     
     print df
-    #df.to_csv(path_out)
+    if path_out is not None:
+        df.to_csv(path_out)
+    
+    return df
+    
+
+def plot_df(df1, df2):
+    
+    df1.plot()
+    plt.ylim([0,250])
+    plt.title('ParrotFP1 - Strawberries')
+    plt.xticks(rotation=30)
+    df2.plot()
+    plt.ylim([0,250])
+    plt.title('ParrotFP2 - Strawberries')
+    plt.xticks(rotation=30)
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -130,17 +147,22 @@ if __name__ == '__main__':
     plants = ['erdbeeren', 'erdbeeren2']
     # add 2 to get UTC+2
     start_date = '2016-06-22T03:00:00Z'
-    end_date = '2016-06-22T14:00:00Z'
+    end_date = '2016-06-24T07:00:00Z'
     print_results = False
     
-    for plant in plants:
-        print plant
-        response, user, versions, samples, \
-                        plants, garden = get_FP_data(plant, start_date,
-                                                     end_date, print_results)
-        timestamp = datetime.now()
-        path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
-        FPdata2df(samples, path_out)
+    response, user, versions, samples1, \
+                    plants, garden = get_FP_data('erdbeeren', start_date,
+                                                 end_date, print_results)
+    response, user, versions, samples2, \
+                    plants, garden = get_FP_data('erdbeeren2', start_date,
+                                                 end_date, print_results)
+    timestamp = datetime.now()
+    
+    #path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
+    df1 = FPdata2df(samples1, path_out=None)
+    df2 = FPdata2df(samples2, path_out=None)
+    
+    plot_df(df1, df2)
     
     print 'Finished'
 
