@@ -108,47 +108,48 @@ def FPdata2df(samples, path_out=None):
         return
     ts = []
     data = []
-    for i in range(len(FP_data)): 
-        ts.append(FP_data[i]['capture_ts'])
-        sm = FP_data[i]['vwc_percent']
+    for i in range(len(FP_data)):
+        date = FP_data[i]['capture_ts'].encode()
+        date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
+        ts.append(date)
+        sm = FP_data[i]['vwc_percent']*2
         temp = FP_data[i]['air_temperature_celsius']
         light = FP_data[i]['par_umole_m2s']
         data.append([sm, temp, light])
-        
+
     ts = np.array(ts)
     data = np.array(data)
-    
-    df = pd.DataFrame(data=data, index=ts, 
+
+    df = pd.DataFrame(data=data, index=ts,
                       columns=['vwc_percent', 'air_temperature_celsius',
                                'par_umole_m2s'])
-    
+
     print df
     if path_out is not None:
         df.to_csv(path_out)
-    
+
     return df
-    
 
 def plot_df(df1, df2):
-    
+
     df1.plot()
-    plt.ylim([0,250])
+    plt.ylim([0, 250])
     plt.title('ParrotFP1 - Strawberries')
     plt.xticks(rotation=30)
     df2.plot()
-    plt.ylim([0,250])
+    plt.ylim([0, 250])
     plt.title('ParrotFP2 - Strawberries')
     plt.xticks(rotation=30)
     plt.show()
 
 
 if __name__ == '__main__':
-    
+
     plants = ['erdbeeren', 'erdbeeren2']
     # add 2 to get UTC+2
     start_date = '2016-06-22T03:00:00Z'
     end_date = '2016-06-24T07:00:00Z'
-    print_results = False
+    print_results = True
     
     response, user, versions, samples1, \
                     plants, garden = get_FP_data('erdbeeren', start_date,
