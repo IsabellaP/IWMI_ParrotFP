@@ -2,14 +2,11 @@
 import os
 from ConfigParser import SafeConfigParser
 import requests
-from pprint import pformat  # here only for aesthetic
+from pprint import pformat
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
-#import pytesmo.temporal_matching as temp_match
-#import pytesmo.scaling as scaling
-#import pytesmo.metrics as metrics
 
 
 def read_cfg(cfg_file, include_default=True, only_default=False):
@@ -53,7 +50,22 @@ def read_cfg(cfg_file, include_default=True, only_default=False):
 
 def get_FP_data(username, password, client_id, client_secret, plant,
                 print_results=True):
+    """ Read data from flower power sensors.
+    
+    Parameters:
+    ----------
+    username, password, client_id, client_secret : str
+        Credentials
+    plant : str
+        plant nickname
+    print_results : bool
+        if True, results are printed as long dictionary
         
+    Returns:
+    -------
+    Flower power data
+    """
+
     req = requests.get('https://apiflowerpower.parrot.com/user/v1/authenticate',
                        data={'grant_type': 'password',
                              'username': username,
@@ -160,23 +172,24 @@ def get_FP_data(username, password, client_id, client_secret, plant,
 
 
 def FPdata2df(samples, resample=None, path_out=None):
-    '''
-    .....
+    """
+    Convert data to nicer format (pd.DataFrame) and write to file, 
+    perform resampling
 
     Parameters
     ----------
-    samples :
-
+    samples : list of dictionaries
+        flower power data
     resample : string
         rule for resampling e.g. 'H' for hourly, 'D' for daily
     path_out : string or None
         path for writing csv file
 
-
     Returns
     -------
-
-    '''
+    df : pd.DataFrame
+        (resampled) flower power data as pd.DataFrame
+    """
 
     # ignore fertilizer for now
     FP_data = samples
@@ -221,17 +234,6 @@ def plot_df(df, title_plant):
     plt.show()
     
 
-def calc_corr(df1, df2):
-    pass
-    
-    #------- df_sm = pd.DataFrame(data=[df1['vwc_percent'], df2['vwc_percent']],
-                         #------------------------------------- index=df1.index,
-                         #------------------------------ columns=['sm1', 'sm2'])
-    #--------------------------------------- corr = df_sm.corr(method='pearson')
-#------------------------------------------------------------------------------ 
-    #--------------------------------------------------------------- return corr
-
-
 if __name__ == '__main__':
     # read credentials
     cfg_path = '/media/sf_H/IWMI/FP_credentials.txt'
@@ -255,13 +257,8 @@ if __name__ == '__main__':
             df = FPdata2df(samples, resample='H', path_out=None)
             plot_df(df, plant)
         except TypeError:
-            # Achtung es kommt keine Fehlermeldung mehr, auch wenn anderer Grund
-            # als unknown plant - anders loesen!
+            # Achtung es kommt ev. keine Fehlermeldung mehr, auch wenn anderer
+            # Grund als unknown plant - anders loesen!
             break
-
-    #timestamp = datetime.now()
-    #path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
-    #corr = calc_corr(df1, df2)
     
     print 'Finished'
-
