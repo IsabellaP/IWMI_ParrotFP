@@ -1,5 +1,6 @@
 # code from http://developer.parrot.com/docs/FlowerPower/?python#authentication
-
+import os
+from ConfigParser import SafeConfigParser
 import requests
 from pprint import pformat  # here only for aesthetic
 import pandas as pd
@@ -11,15 +12,48 @@ import matplotlib.pyplot as plt
 #import pytesmo.metrics as metrics
 
 
-def get_FP_data(plant, print_results=True):
-    # First we set our credentials
-    username = 'isabella.pfeil@gmail.com'
-    password = 'flowerpower1'
-    
-    #from the developer portal
-    client_id = 'isabella.pfeil@gmail.com'
-    client_secret = 'SONKzgRvZ2uKv1lb8LI7qBDE7JBw3M81FX10jDQq6F4oHtGm'
-    
+def read_cfg(cfg_file, include_default=True, only_default=False):
+    """
+    Reads a WARP configuration file.
+
+    Parameters
+    ----------
+    cfg_file : str
+        File name of the configuration file.
+    include_default : bool, optional
+        Include default items. Default: True
+    only_default : bool, optional
+        Return only default items. Default: False
+
+    Returns
+    -------
+    ds : dict
+        Dictionary generated from the items and values in the config file.
+    """
+    if not os.path.isfile(cfg_file):
+        raise IOError("Configuration file does not exist {:}".format(cfg_file))
+
+    config = SafeConfigParser()
+    config.read(cfg_file)
+
+    cfg = {}
+
+    if only_default:
+        for item, value in config.defaults().iteritems():
+            cfg[item] = eval_param(item, value)
+    else:
+        for section in config.sections():
+            cfg[section] = {}
+            for item, value in config.items(section):
+                if include_default or item not in config.defaults().keys():
+                    cfg[section][item] = value
+
+    return cfg
+
+
+def get_FP_data(username, password, client_id, client_secret, plant,
+                print_results=True):
+        
     req = requests.get('https://apiflowerpower.parrot.com/user/v1/authenticate',
                        data={'grant_type': 'password',
                              'username': username,
@@ -199,6 +233,11 @@ def calc_corr(df1, df2):
 
 
 if __name__ == '__main__':
+    # read credentials
+    cfg_path = '/media/sf_H/IWMI/FP_credentials.txt'
+    cfg = read_cfg(cfg_path)
+    cred = cfg['credentials']
+    
     # possible plants: Balkonpflanze, Blumen, Lehmboden, Erdbeeren2, 
     # Sandige Erde, Petzenkirchen_Ackerrand, Dieffenbacchia, Erdbeeren
     plants = ['Blumen']
@@ -208,7 +247,11 @@ if __name__ == '__main__':
     for plant in plants:
         try:
             response, user, versions, samples, \
-                        plants, garden = get_FP_data(plant, print_results)
+                        plants, garden = get_FP_data(cred['username'], 
+                                                     cred['password'],
+                                                     cred['client_id'],
+                                                     cred['client_secret'],
+                                                     plant, print_results)
             df = FPdata2df(samples, resample='H', path_out=None)
             plot_df(df, plant)
         except TypeError:
