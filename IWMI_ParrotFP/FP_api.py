@@ -58,16 +58,11 @@ def get_FP_data(plant, print_results=True):
     
     plants = req.json()
 
-    # Set your own authentication token
-    req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v3/sync',
-                            headers={'Authorization':
-                                'Bearer {token}'.format(token=access_token)})
-
-    plants = req.json()
-
     # find plant and startdate in dictionary
     location_identifier = None
+    possible_plants = []
     for i in range(len(plants['locations'])):
+        possible_plants.append(plants['locations'][i]['plant_nickname'])
         if plants['locations'][i]['plant_nickname'] == plant:
             startdate = plants['locations'][i]['plant_assigned_date'].encode()
             startdate = datetime.strptime(startdate, '%Y-%m-%dT%H:%M:%SZ')
@@ -75,7 +70,7 @@ def get_FP_data(plant, print_results=True):
             break
     
     if location_identifier is None:
-        print 'Unknown plant'
+        print 'Unknown plant. Chose one of '+str(possible_plants)
         return
 
     enddate = startdate + timedelta(days=10)
@@ -92,7 +87,8 @@ def get_FP_data(plant, print_results=True):
     data = []
     # merge all dates in 10days steps till datetime.now
     for d in range(len(dates)-1):
-	print 'Read data for '+plant+ ' from '+dates[d]+' to '+dates[d+1]
+        print('Read data for '+plant+ ' from '+str(dates[d])+
+              ' to '+str(dates[d+1]))
         req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v2/sample/location/'
                        + location_identifier,
                        headers={'Authorization': 
@@ -130,7 +126,6 @@ def get_FP_data(plant, print_results=True):
 
 
 def FPdata2df(samples, resample=None, path_out=None):
-
     '''
     .....
 
@@ -173,7 +168,7 @@ def FPdata2df(samples, resample=None, path_out=None):
                       columns=['vwc_percent', 'air_temperature_celsius',
                                'par_umole_m2s'])
     if resample is not None:
-        df.resample(resample, how='mean')
+        df = df.resample(resample, how='mean')
 
     print df
 
@@ -183,9 +178,9 @@ def FPdata2df(samples, resample=None, path_out=None):
     return df
 
 
-def plot_df(df1, title_plant):
+def plot_df(df, title_plant):
     
-    df1.plot()
+    df.plot()
     plt.ylim([0,250])
     plt.title('ParrotFP '+title_plant)
     plt.xticks(rotation=30)
@@ -206,23 +201,23 @@ def calc_corr(df1, df2):
 if __name__ == '__main__':
     # possible plants: Balkonpflanze, Blumen, Lehmboden, Erdbeeren2, 
     # Sandige Erde, Petzenkirchen_Ackerrand, Dieffenbacchia, Erdbeeren
-    plants = ['Balkonpflanze', 'Sandige Erde']
-    # add 2 to get UTC+2
-    start_date = '2016-07-02T08:00:00Z'
-    end_date = '2016-07-12T08:00:00Z'
+    plants = ['Blumen']
 
     print_results = False
     
     for plant in plants:
-        response, user, versions, samples, \
-                    plants, garden = get_FP_data('Balkonpflanze', print_results)
-        df = FPdata2df(samples, resample='H', path_out=None)
-        plot_df(df, plant)
+        try:
+            response, user, versions, samples, \
+                        plants, garden = get_FP_data(plant, print_results)
+            df = FPdata2df(samples, resample='H', path_out=None)
+            plot_df(df, plant)
+        except TypeError:
+            # Achtung es kommt keine Fehlermeldung mehr, auch wenn anderer Grund
+            # als unknown plant - anders loesen!
+            break
 
     #timestamp = datetime.now()
     #path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
-    
-
     #corr = calc_corr(df1, df2)
     
     print 'Finished'
