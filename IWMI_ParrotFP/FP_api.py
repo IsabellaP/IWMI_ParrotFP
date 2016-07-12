@@ -49,21 +49,14 @@ def get_FP_data(plant, print_results=True):
                                 'Bearer {token}'.format(token=access_token)})
     
     
-    versions = req.json()    
-
-    if plant == 'Erdbeeren':
-        location_identifier = 'vTPyGmPsbl1466103276199'
-    elif plant == 'Dieffenbacchia':
-        location_identifier = 'LBFxUGtLcT1465927113542'
-    elif plant == 'Petzenkirchen_Ackerrand':
-        location_identifier = 'Y3QjXXEQmN1466537309325'
-    elif plant == 'Erdbeeren2':
-        location_identifier = 'Enww4lXuIL1466518968168'
-    elif plant == 'Balkonpflanze':
-        location_identifier = '4EUPOCN4yH1467128358630'
-    elif plant == 'Sandige Erde':
-        location_identifier = 'slvfkXyzFV1467128115063'
-
+    versions = req.json()
+    
+    # Set your own authentication token
+    req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v3/sync',
+                            headers={'Authorization':
+                                'Bearer {token}'.format(token=access_token)})
+    
+    plants = req.json()
 
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v3/sync',
@@ -73,11 +66,17 @@ def get_FP_data(plant, print_results=True):
     plants = req.json()
 
     # find plant and startdate in dictionary
+    location_identifier = None
     for i in range(len(plants['locations'])):
         if plants['locations'][i]['plant_nickname'] == plant:
             startdate = plants['locations'][i]['plant_assigned_date'].encode()
             startdate = datetime.strptime(startdate, '%Y-%m-%dT%H:%M:%SZ')
+	    location_identifier = plants['locations'][i]['location_identifier']
             break
+    
+    if location_identifier is None:
+        print 'Unknown plant'
+        return
 
     enddate = startdate + timedelta(days=10)
     timestamp = datetime.now()
@@ -93,6 +92,7 @@ def get_FP_data(plant, print_results=True):
     data = []
     # merge all dates in 10days steps till datetime.now
     for d in range(len(dates)-1):
+	print 'Read data for '+plant+ ' from '+dates[d]+' to '+dates[d+1]
         req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v2/sample/location/'
                        + location_identifier,
                        headers={'Authorization': 
@@ -121,6 +121,8 @@ def get_FP_data(plant, print_results=True):
         print('Samples: \n {0}'.format(pformat(data)))
         # Plant data, plant settings
         print('Data and settings of each plant: \n {0}'.format(pformat(plants)))
+        # time series for given location
+        print('Samples: \n {0}'.format(pformat(samples)))
         # garden status for each location
         print('Garden status for each location: \n {0}'.format(pformat(garden)))
     
@@ -180,15 +182,12 @@ def FPdata2df(samples, resample=None, path_out=None):
 
     return df
 
-def plot_df(df1, df2):
 
+def plot_df(df1, title_plant):
+    
     df1.plot()
-    plt.ylim([0, 250])
-    plt.title('ParrotFP1 - Strawberries')
-    plt.xticks(rotation=30)
-    df2.plot()
-    plt.ylim([0, 250])
-    plt.title('ParrotFP2 - Strawberries')
+    plt.ylim([0,250])
+    plt.title('ParrotFP '+title_plant)
     plt.xticks(rotation=30)
     plt.show()
     
@@ -205,7 +204,8 @@ def calc_corr(df1, df2):
 
 
 if __name__ == '__main__':
-
+    # possible plants: Balkonpflanze, Blumen, Lehmboden, Erdbeeren2, 
+    # Sandige Erde, Petzenkirchen_Ackerrand, Dieffenbacchia, Erdbeeren
     plants = ['Balkonpflanze', 'Sandige Erde']
     # add 2 to get UTC+2
     start_date = '2016-07-02T08:00:00Z'
@@ -213,18 +213,17 @@ if __name__ == '__main__':
 
     print_results = False
     
-    response, user, versions, samples1, \
+    for plant in plants:
+        response, user, versions, samples, \
                     plants, garden = get_FP_data('Balkonpflanze', print_results)
-    response, user, versions, samples2, \
-                    plants, garden = get_FP_data('Petzenkirchen_Ackerrand', print_results)
-    timestamp = datetime.now()
-    
+        df = FPdata2df(samples, resample='H', path_out=None)
+        plot_df(df, plant)
+
+    #timestamp = datetime.now()
     #path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
-    df1 = FPdata2df(samples1, resample='H', path_out=None)
-    df2 = FPdata2df(samples2, path_out=None)
-    corr = calc_corr(df1, df2)
     
-    plot_df(df1, df2)
+
+    #corr = calc_corr(df1, df2)
     
     print 'Finished'
 
