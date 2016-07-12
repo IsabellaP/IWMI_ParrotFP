@@ -6,6 +6,9 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+#import pytesmo.temporal_matching as temp_match
+#import pytesmo.scaling as scaling
+#import pytesmo.metrics as metrics
 
 
 def get_FP_data(plant, print_results=True):
@@ -188,6 +191,17 @@ def plot_df(df1, df2):
     plt.title('ParrotFP2 - Strawberries')
     plt.xticks(rotation=30)
     plt.show()
+    
+
+def calc_corr(df1, df2):
+    pass
+    
+    #------- df_sm = pd.DataFrame(data=[df1['vwc_percent'], df2['vwc_percent']],
+                         #------------------------------------- index=df1.index,
+                         #------------------------------ columns=['sm1', 'sm2'])
+    #--------------------------------------- corr = df_sm.corr(method='pearson')
+#------------------------------------------------------------------------------ 
+    #--------------------------------------------------------------- return corr
 
 
 if __name__ == '__main__':
@@ -196,6 +210,7 @@ if __name__ == '__main__':
     # add 2 to get UTC+2
     start_date = '2016-07-02T08:00:00Z'
     end_date = '2016-07-12T08:00:00Z'
+
     print_results = False
     
     response, user, versions, samples1, \
@@ -207,6 +222,7 @@ if __name__ == '__main__':
     #path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
     df1 = FPdata2df(samples1, resample='H', path_out=None)
     df2 = FPdata2df(samples2, path_out=None)
+    corr = calc_corr(df1, df2)
     
     plot_df(df1, df2)
     
