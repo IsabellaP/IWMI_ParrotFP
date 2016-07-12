@@ -56,7 +56,11 @@ def get_FP_data(plant, start_date, end_date, print_results=True):
         location_identifier = 'Y3QjXXEQmN1466537309325'
     elif plant == 'erdbeeren2':
         location_identifier = 'Enww4lXuIL1466518968168'
-    
+    elif plant == 'Balkonpflanze':
+        location_identifier = '4EUPOCN4yH1467128358630'
+    elif plant == 'Sandige Erde':
+        location_identifier = 'slvfkXyzFV1467128115063'
+
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v2/sample/location/' 
                        + location_identifier,
@@ -99,8 +103,26 @@ def get_FP_data(plant, start_date, end_date, print_results=True):
     return response, user, versions, samples, plants, garden
 
 
-def FPdata2df(samples, path_out=None):
-    
+def FPdata2df(samples, resample=None, path_out=None):
+
+    '''
+    .....
+
+    Parameters
+    ----------
+    samples :
+
+    resample : string
+        rule for resampling e.g. 'H' for hourly, 'D' for daily
+    path_out : string or None
+        path for writing csv file
+
+
+    Returns
+    -------
+
+    '''
+
     # ignore fertilizer for now
     FP_data = samples['samples']
     if len(FP_data) == 0:
@@ -119,12 +141,16 @@ def FPdata2df(samples, path_out=None):
 
     ts = np.array(ts)
     data = np.array(data)
+    data[np.where(data[:, 0] > 100), 0] = 100
 
     df = pd.DataFrame(data=data, index=ts,
                       columns=['vwc_percent', 'air_temperature_celsius',
                                'par_umole_m2s'])
+    if resample is not None:
+        df.resample(resample, how='mean')
 
     print df
+
     if path_out is not None:
         df.to_csv(path_out)
 
@@ -145,22 +171,22 @@ def plot_df(df1, df2):
 
 if __name__ == '__main__':
 
-    plants = ['erdbeeren', 'erdbeeren2']
+    plants = ['Balkonpflanze', 'Sandige Erde']
     # add 2 to get UTC+2
-    start_date = '2016-06-22T03:00:00Z'
-    end_date = '2016-06-24T07:00:00Z'
-    print_results = True
+    start_date = '2016-07-02T08:00:00Z'
+    end_date = '2016-07-12T08:00:00Z'
+    print_results = False
     
     response, user, versions, samples1, \
-                    plants, garden = get_FP_data('erdbeeren', start_date,
+                    plants, garden = get_FP_data('Balkonpflanze', start_date,
                                                  end_date, print_results)
     response, user, versions, samples2, \
-                    plants, garden = get_FP_data('erdbeeren2', start_date,
+                    plants, garden = get_FP_data('Sandige Erde', start_date,
                                                  end_date, print_results)
     timestamp = datetime.now()
     
     #path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
-    df1 = FPdata2df(samples1, path_out=None)
+    df1 = FPdata2df(samples1, resample='H', path_out=None)
     df2 = FPdata2df(samples2, path_out=None)
     
     plot_df(df1, df2)
