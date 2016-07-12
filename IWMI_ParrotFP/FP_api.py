@@ -6,6 +6,9 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
+#import pytesmo.temporal_matching as temp_match
+#import pytesmo.scaling as scaling
+#import pytesmo.metrics as metrics
 
 
 def get_FP_data(plant, start_date, end_date, print_results=True):
@@ -114,15 +117,16 @@ def FPdata2df(samples, path_out=None):
         temp = FP_data[i]['air_temperature_celsius']
         light = FP_data[i]['par_umole_m2s']
         data.append([sm, temp, light])
-        
-    ts = np.array(ts)
+    
+    dt = [datetime.strptime(timest, '%Y-%m-%dT%H:%M:%SZ') for timest in ts]  
+    dt = np.array(dt)
     data = np.array(data)
     
-    df = pd.DataFrame(data=data, index=ts, 
+    df = pd.DataFrame(data=data, index=dt, 
                       columns=['vwc_percent', 'air_temperature_celsius',
                                'par_umole_m2s'])
     
-    print df
+    #print df
     if path_out is not None:
         df.to_csv(path_out)
     
@@ -140,14 +144,25 @@ def plot_df(df1, df2):
     plt.title('ParrotFP2 - Strawberries')
     plt.xticks(rotation=30)
     plt.show()
+    
+
+def calc_corr(df1, df2):
+    pass
+    
+    #------- df_sm = pd.DataFrame(data=[df1['vwc_percent'], df2['vwc_percent']],
+                         #------------------------------------- index=df1.index,
+                         #------------------------------ columns=['sm1', 'sm2'])
+    #--------------------------------------- corr = df_sm.corr(method='pearson')
+#------------------------------------------------------------------------------ 
+    #--------------------------------------------------------------- return corr
 
 
 if __name__ == '__main__':
     
     plants = ['erdbeeren', 'erdbeeren2']
     # add 2 to get UTC+2
-    start_date = '2016-06-22T03:00:00Z'
-    end_date = '2016-06-24T07:00:00Z'
+    start_date = '2016-06-18T10:00:00Z'
+    end_date = '2016-06-27T10:00:00Z'
     print_results = False
     
     response, user, versions, samples1, \
@@ -161,6 +176,7 @@ if __name__ == '__main__':
     #path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
     df1 = FPdata2df(samples1, path_out=None)
     df2 = FPdata2df(samples2, path_out=None)
+    corr = calc_corr(df1, df2)
     
     plot_df(df1, df2)
     
