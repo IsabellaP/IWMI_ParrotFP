@@ -4,11 +4,11 @@ import requests
 from pprint import pformat  # here only for aesthetic
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
 
-def get_FP_data(plant, start_date, end_date, print_results=True):
+def get_FP_data(plant, print_results=True):
     # First we set our credentials
     username = 'isabella.pfeil@gmail.com'
     password = 'flowerpower1'
@@ -48,37 +48,58 @@ def get_FP_data(plant, start_date, end_date, print_results=True):
     
     versions = req.json()    
 
-    if plant == 'erdbeeren':
+    if plant == 'Erdbeeren':
         location_identifier = 'vTPyGmPsbl1466103276199'
-    elif plant == 'dieffenbacchia':
+    elif plant == 'Dieffenbacchia':
         location_identifier = 'LBFxUGtLcT1465927113542'
-    elif plant == 'petzenkirchen':
+    elif plant == 'Petzenkirchen_Ackerrand':
         location_identifier = 'Y3QjXXEQmN1466537309325'
-    elif plant == 'erdbeeren2':
+    elif plant == 'Erdbeeren2':
         location_identifier = 'Enww4lXuIL1466518968168'
     elif plant == 'Balkonpflanze':
         location_identifier = '4EUPOCN4yH1467128358630'
     elif plant == 'Sandige Erde':
         location_identifier = 'slvfkXyzFV1467128115063'
 
-    # Set your own authentication token
-    req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v2/sample/location/' 
-                       + location_identifier,
-                       headers={'Authorization': 
-                                'Bearer {token}'.format(token=access_token)},
-                       params={'from_datetime_utc': start_date,
-                               'to_datetime_utc': end_date})
-    
-    samples = req.json()
-    
+
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v3/sync',
                             headers={'Authorization':
                                 'Bearer {token}'.format(token=access_token)})
-    
+
     plants = req.json()
-    
-    
+
+    # find plant and startdate in dictionary
+    for i in range(len(plants['locations'])):
+        if plants['locations'][i]['plant_nickname'] == plant:
+            startdate = plants['locations'][i]['plant_assigned_date'].encode()
+            startdate = datetime.strptime(startdate, '%Y-%m-%dT%H:%M:%SZ')
+            break
+
+    enddate = startdate + timedelta(days=10)
+    timestamp = datetime.now()
+    dates = []
+
+    # create date range from startdate to datetime.now - delta is 10 days
+    for delta in range(int((timestamp - startdate).days/10.+1)):
+        date = startdate + timedelta(days=10*delta)
+        dates.append(date)
+
+    dates.append(timestamp)
+
+    data = []
+    # merge all dates in 10days steps till datetime.now
+    for d in range(len(dates)-1):
+        req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v2/sample/location/'
+                       + location_identifier,
+                       headers={'Authorization': 
+                                'Bearer {token}'.format(token=access_token)},
+                       params={'from_datetime_utc': dates[d],
+                               'to_datetime_utc': dates[d+1]})
+        samples = req.json()
+        data += (samples['samples'])
+
+
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v4/garden_locations_status',
                        headers={'Authorization': 
@@ -94,13 +115,13 @@ def get_FP_data(plant, start_date, end_date, print_results=True):
         # versions
         print('Versions: \n {0}'.format(pformat(versions)))
         # time series for given location
-        print('Samples: \n {0}'.format(pformat(samples)))
+        print('Samples: \n {0}'.format(pformat(data)))
         # Plant data, plant settings
         print('Data and settings of each plant: \n {0}'.format(pformat(plants)))
         # garden status for each location
         print('Garden status for each location: \n {0}'.format(pformat(garden)))
     
-    return response, user, versions, samples, plants, garden
+    return response, user, versions, data, plants, garden
 
 
 def FPdata2df(samples, resample=None, path_out=None):
@@ -124,7 +145,7 @@ def FPdata2df(samples, resample=None, path_out=None):
     '''
 
     # ignore fertilizer for now
-    FP_data = samples['samples']
+    FP_data = samples
     if len(FP_data) == 0:
         print 'Empty dataset.'
         return
@@ -178,11 +199,9 @@ if __name__ == '__main__':
     print_results = False
     
     response, user, versions, samples1, \
-                    plants, garden = get_FP_data('Balkonpflanze', start_date,
-                                                 end_date, print_results)
+                    plants, garden = get_FP_data('Balkonpflanze', print_results)
     response, user, versions, samples2, \
-                    plants, garden = get_FP_data('Sandige Erde', start_date,
-                                                 end_date, print_results)
+                    plants, garden = get_FP_data('Petzenkirchen_Ackerrand', print_results)
     timestamp = datetime.now()
     
     #path_out = '/data/ParrotFP/ParrotFP_'+plant+str(timestamp)+'.csv'
