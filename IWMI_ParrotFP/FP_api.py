@@ -7,7 +7,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
-
+from pytesmo.temporal_matching import matching
+import pytesmo.metrics as metrics
 
 def read_cfg(cfg_file, include_default=True, only_default=False):
     """
@@ -217,7 +218,7 @@ def FPdata2df(samples, resample=None, path_out=None):
 def plot_df(df, title_plant):
     
     df.plot()
-    plt.ylim([0,250])
+    plt.ylim([0, 250])
     plt.title('ParrotFP '+title_plant)
     plt.xticks(rotation=30)
     plt.show()
@@ -232,10 +233,10 @@ if __name__ == '__main__':
     
     # possible plants: Balkonpflanze, Blumen, Lehmboden, Erdbeeren2, 
     # Sandige Erde, Petzenkirchen_Ackerrand, Dieffenbacchia, Erdbeeren
-    plants = ['Blumen']
+    plants = ['Petzenkirchen_Ackerrand']
 
     print_results = False
-    
+    ascat_ssm = pd.DataFrame.from_csv('D:\IWMI\\ascat_SSM\\ascat_ssm.csv')
     for plant in plants:
         try:
             response, user, versions, samples, \
@@ -250,5 +251,8 @@ if __name__ == '__main__':
             # Achtung es kommt ev. keine Fehlermeldung mehr, auch wenn anderer
             # Grund als unknown plant - anders loesen!
             break
-    
+
+    data_together = matching(ascat_ssm, df)
+    rho = metrics.spearmanr(data_together['vwc_percent'].iloc[:-3], data_together['ssm_ascat'].iloc[:-3])
+
     print 'Finished'
