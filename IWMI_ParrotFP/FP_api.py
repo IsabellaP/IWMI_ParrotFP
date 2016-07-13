@@ -79,28 +79,21 @@ def get_FP_data(username, password, client_id, client_secret, plant,
     access_token = response['access_token']
     auth_header = {'Authorization': 'Bearer {token}'.format(token=access_token)}
     
-    # From now on, we won't need initial credentials: access_token and auth_header will be enough.
-    
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/user/v4/profile',
-                       headers={'Authorization': 
-                                'Bearer {token}'.format(token=access_token)})
-    
-    
+                       headers=auth_header)
+
     user = req.json()
     
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/user/v1/versions',
-                       headers={'Authorization': 
-                                'Bearer {token}'.format(token=access_token)})
-    
-    
+                       headers=auth_header)
+
     versions = req.json()
     
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v3/sync',
-                            headers={'Authorization':
-                                'Bearer {token}'.format(token=access_token)})
+                            headers=auth_header)
     
     plants = req.json()
 
@@ -119,16 +112,15 @@ def get_FP_data(username, password, client_id, client_secret, plant,
         print 'Unknown plant. Chose one of '+str(possible_plants)
         return
 
-    enddate = startdate + timedelta(days=10)
-    timestamp = datetime.now()
+    date_now = datetime.now()
     dates = []
 
     # create date range from startdate to datetime.now - delta is 10 days
-    for delta in range(int((timestamp - startdate).days/10.+1)):
+    for delta in range(int((date_now - startdate).days/10.+1)):
         date = startdate + timedelta(days=10*delta)
         dates.append(date)
 
-    dates.append(timestamp)
+    dates.append(date_now)
 
     data = []
     # merge all dates in 10days steps till datetime.now
@@ -137,18 +129,15 @@ def get_FP_data(username, password, client_id, client_secret, plant,
               ' to '+str(dates[d+1]))
         req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v2/sample/location/'
                        + location_identifier,
-                       headers={'Authorization': 
-                                'Bearer {token}'.format(token=access_token)},
+                       headers=auth_header,
                        params={'from_datetime_utc': dates[d],
                                'to_datetime_utc': dates[d+1]})
         samples = req.json()
         data += (samples['samples'])
 
-
     # Set your own authentication token
     req = requests.get('https://apiflowerpower.parrot.com/sensor_data/v4/garden_locations_status',
-                       headers={'Authorization': 
-                                'Bearer {token}'.format(token=access_token)})
+                       headers=auth_header)
     
     garden = req.json()
     
@@ -236,7 +225,8 @@ def plot_df(df, title_plant):
 
 if __name__ == '__main__':
     # read credentials
-    cfg_path = '/media/sf_H/IWMI/FP_credentials.txt'
+    #cfg_path = '/media/sf_H/IWMI/FP_credentials.txt'
+    cfg_path = 'D:\IWMI\FP_credentials.txt'
     cfg = read_cfg(cfg_path)
     cred = cfg['credentials']
     
