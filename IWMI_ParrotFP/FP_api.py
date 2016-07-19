@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from pytesmo.temporal_matching import matching
 import pytesmo.metrics as metrics
 
+
 def read_cfg(cfg_file, include_default=True, only_default=False):
     """
     Reads a WARP configuration file.
@@ -207,12 +208,35 @@ def FPdata2df(samples, resample=None, path_out=None):
     if resample is not None:
         df = df.resample(resample, how='mean')
 
-    print df
-
     if path_out is not None:
         df.to_csv(path_out)
 
     return df
+
+
+def read_HOAL(hoal_path):
+    """ Read HOAL soil moisture and temperature from upper layer (5 cm)"""
+    
+    hoal = pd.DataFrame()
+    
+    for hoal_file in sorted(os.listdir(hoal_path)):
+        if hoal_file[0] == '.':
+            continue
+        hoal_data = pd.read_csv(os.path.join(hoal_path, hoal_file),
+                                header=None, sep=';', skiprows=13,
+                                names=['date', 'time', 'sm0.05', 'ts0.05'],
+                                usecols=[0,1,2,7])
+        hoal = hoal.append(hoal_data)
+
+    date_idx=hoal['date']+' '+hoal['time']
+    date_idx = [datetime.strptime(date, '%d.%m.%Y %H:%M:%S') 
+                for date in date_idx]
+    # apply calibration from Mariette
+    sm_calib = hoal['sm0.05'].values*0.559901289301 + 16.2029118301
+    hoal_df = pd.DataFrame(sm_calib, index=date_idx, columns=['sm0.05'])
+    hoal_df['ts0.05'] = hoal['ts0.05'].values 
+    
+    return hoal_df
 
 
 def plot_df(df, title_plant):
@@ -225,10 +249,12 @@ def plot_df(df, title_plant):
     
 
 if __name__ == '__main__':
-    # read credentials and ascat ssm
-    cfg_path = '/media/sf_H/IWMI/FP_credentials.txt'
-    ascat_ssm = pd.DataFrame.from_csv('/media/sf_H/IWMI/ascat_ssm.csv')
+    # read credentials, ascat and HOAL ssm - linux paths
+    cfg_path = '/media/sf_D/0_IWMI_DATASETS/FP_credentials.txt'
+    ascat_ssm = pd.DataFrame.from_csv('/media/sf_D/0_IWMI_DATASETS/ascat_ssm.csv')
+    hoal_df = read_HOAL('/media/sf_D/0_IWMI_DATASETS/HOAL/')
     
+    # windows paths
     #cfg_path = 'D:\IWMI\FP_credentials.txt'
     #ascat_ssm = pd.DataFrame.from_csv('D:\IWMI\\ascat_SSM\\ascat_ssm.csv')
     
@@ -237,7 +263,7 @@ if __name__ == '__main__':
     
     # possible plants: Balkonpflanze, Blumen, Lehmboden, Erdbeeren2, 
     # Sandige Erde, Petzenkirchen_Ackerrand, Dieffenbacchia, Erdbeeren
-    plants = ['Blumen']
+    plants = ['Petzenkirchen_Ackerrand']
 
     print_results = False
 
@@ -250,11 +276,27 @@ if __name__ == '__main__':
                                                      cred['client_secret'],
                                                      plant, print_results)
             df = FPdata2df(samples, resample='H', path_out=None)
-            plot_df(df, plant)
+            #plot_df(df, plant)
         except TypeError:
             break
 
-    data_together = matching(ascat_ssm, df)
-    rho = metrics.spearmanr(data_together['vwc_percent'].iloc[:-3], data_together['ssm_ascat'].iloc[:-3])
+    data_together = matching(ascat_ssm, df, hoal_df)
+    ascat_rho = metrics.spearmanr(data_together['vwc_percent'].iloc[:-3], 
+                                  data_together['ssm_ascat'].iloc[:-3])
+    
+    hoal_rho_sm = metrics.spearmanr(data_together['vwc_percent'].iloc[:-3], 
+                                    data_together['sm0.05'].iloc[:-3])
+    hoal_rho_ts = metrics.spearmanr(data_together['air_temperature_'+
+                                                       'celsius'].iloc[:-3], 
+                                    data_together['ts0.05'].iloc[:-3])
+    
+    print ascat_rho
+    print hoal_rho_sm
+    print hoal_rho_ts
 
+    data_together.plot()
+    plt.title('Satellite and in-situ soil moisture, temperature and sunlight'+
+              '\n HOAL Petzenkirchen')
+    plt.show()
+    
     print 'Finished'
