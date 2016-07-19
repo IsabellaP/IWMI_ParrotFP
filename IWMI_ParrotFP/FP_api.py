@@ -225,18 +225,22 @@ def plot_df(df, title_plant):
     
 
 if __name__ == '__main__':
-    # read credentials
-    #cfg_path = '/media/sf_H/IWMI/FP_credentials.txt'
-    cfg_path = 'D:\IWMI\FP_credentials.txt'
+    # read credentials and ascat ssm
+    cfg_path = '/media/sf_H/IWMI/FP_credentials.txt'
+    ascat_ssm = pd.DataFrame.from_csv('/media/sf_H/IWMI/ascat_ssm.csv')
+    
+    #cfg_path = 'D:\IWMI\FP_credentials.txt'
+    #ascat_ssm = pd.DataFrame.from_csv('D:\IWMI\\ascat_SSM\\ascat_ssm.csv')
+    
     cfg = read_cfg(cfg_path)
     cred = cfg['credentials']
     
     # possible plants: Balkonpflanze, Blumen, Lehmboden, Erdbeeren2, 
     # Sandige Erde, Petzenkirchen_Ackerrand, Dieffenbacchia, Erdbeeren
-    plants = ['Petzenkirchen_Ackerrand']
+    plants = ['Blumen']
 
     print_results = False
-    ascat_ssm = pd.DataFrame.from_csv('D:\IWMI\\ascat_SSM\\ascat_ssm.csv')
+
     for plant in plants:
         try:
             response, user, versions, samples, \
@@ -248,8 +252,6 @@ if __name__ == '__main__':
             df = FPdata2df(samples, resample='H', path_out=None)
             plot_df(df, plant)
         except TypeError:
-            # Achtung es kommt ev. keine Fehlermeldung mehr, auch wenn anderer
-            # Grund als unknown plant - anders loesen!
             break
 
     data_together = matching(ascat_ssm, df)
