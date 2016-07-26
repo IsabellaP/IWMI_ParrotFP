@@ -193,7 +193,7 @@ def FPdata2df(samples, resample=None, path_out=None):
         date = FP_data[i]['capture_ts'].encode()
         date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
         ts.append(date)
-        sm = FP_data[i]['vwc_percent']*2
+        sm = FP_data[i]['vwc_percent']
         temp = FP_data[i]['air_temperature_celsius']
         light = FP_data[i]['par_umole_m2s']
         data.append([sm, temp, light])
@@ -203,10 +203,10 @@ def FPdata2df(samples, resample=None, path_out=None):
     data[np.where(data[:, 0] > 100), 0] = 100
 
     df = pd.DataFrame(data=data, index=ts,
-                      columns=['vwc_percent', 'air_temperature_celsius',
+                      columns=['Parrot_vwc', 'air_temperature_celsius',
                                'par_umole_m2s'])
     if resample is not None:
-        df = df.resample(resample, how='mean')
+        df = df.resample(resample).mean()
 
     if path_out is not None:
         df.to_csv(path_out)
@@ -214,17 +214,18 @@ def FPdata2df(samples, resample=None, path_out=None):
     return df
 
 
-def read_HOAL(hoal_path):
+def read_HOAL(path):
     """ Read HOAL soil moisture and temperature from upper layer (5 cm)"""
     
     hoal = pd.DataFrame()
     
-    for hoal_file in sorted(os.listdir(hoal_path)):
+    for hoal_file in sorted(os.listdir(path)):
         if hoal_file[0] == '.':
             continue
-        hoal_data = pd.read_csv(os.path.join(hoal_path, hoal_file),
+        hoal_data = pd.read_csv(os.path.join(path, hoal_file),
                                 header=None, sep=';', skiprows=13,
-                                names=['date', 'time', 'sm0.05', 'ts0.05'],
+                                names=['date', 'time', 'HOAL_sm0.05', 
+                                       'HOAL_ts0.05'],
                                 usecols=[0,1,2,7])
         hoal = hoal.append(hoal_data)
 
@@ -232,11 +233,69 @@ def read_HOAL(hoal_path):
     date_idx = [datetime.strptime(date, '%d.%m.%Y %H:%M:%S') 
                 for date in date_idx]
     # apply calibration from Mariette
-    sm_calib = hoal['sm0.05'].values*0.559901289301 + 16.2029118301
-    hoal_df = pd.DataFrame(sm_calib, index=date_idx, columns=['sm0.05'])
-    hoal_df['ts0.05'] = hoal['ts0.05'].values 
+    sm_calib = hoal['HOAL_sm0.05'].values*0.559901289301 + 16.2029118301
+    hoal_df = pd.DataFrame(sm_calib, index=date_idx, columns=['HOAL_sm0.05'])
+    hoal_df['HOAL_ts0.05'] = hoal['HOAL_ts0.05'].values 
     
     return hoal_df
+
+
+def read_HOAL_raw(path):
+    """Read HOAL raw data"""
+    
+    columns = ['date', 'time', 'HOAL_raw_sm1']
+
+    box22 = pd.read_csv(os.path.join(path, 'Box_022.dat'), delimiter='\t',
+                        names=columns, decimal=',', usecols=[1,2,5],
+                        parse_dates=[[0, 1]], dayfirst=True, skiprows=0)
+    
+    box22_df = pd.DataFrame(box22['HOAL_raw_sm1'].values, index=box22['date_time'], 
+                            columns=['HOAL_raw_sm1'])
+
+    return box22_df
+
+
+def calc_rho(ascat_ssm, FP_df, hoal_df, hoal_raw):
+    # multiply ASCAT with porosity (0.54) to get same units
+    ascat_ssm['ssm_ascat'] = ascat_ssm['ssm_ascat']*0.54
+    
+    # in welcher Reihenfolge matchen
+    data_together1 = matching(FP_df, ascat_ssm, hoal_df, hoal_raw)
+    data_together = matching(ascat_ssm, FP_df, hoal_df, hoal_raw)
+    data_together2 = matching(FP_df, hoal_df)
+    print('ref: FP', data_together)
+    print('ref: ASCAT', data_together1)
+    
+    ascat_rho = metrics.spearmanr(data_together['Parrot_vwc'].iloc[:-3], 
+                                  data_together['ssm_ascat'].iloc[:-3])
+    
+    hoal_rho_sm = metrics.spearmanr(data_together['Parrot_vwc'].iloc[:-3], 
+                                    data_together['HOAL_sm0.05'].iloc[:-3])
+    hoal_rho_ts = metrics.spearmanr(data_together['air_temperature_'+
+                                                       'celsius'].iloc[:-3], 
+                                    data_together['HOAL_ts0.05'].iloc[:-3])
+    hoal_raw_rho_sm = metrics.spearmanr(data_together['Parrot_vwc'].iloc[:-3], 
+                                    data_together['HOAL_raw_sm1'].iloc[:-3])
+    
+    print ascat_rho
+    print hoal_rho_sm
+    print hoal_rho_ts
+    print hoal_raw_rho_sm
+
+    exclude = ['HOAL_ts0.05', 'air_temperature_celsius', 'par_umole_m2s',
+               'merge_key']
+    data_together.ix[:, data_together.columns.difference(exclude)].plot()
+    plt.title('Satellite and in-situ soil moisture, HOAL Petzenkirchen, station 22'+
+              '\n rho_ASCAT_Parrot: '+str(np.round(ascat_rho[0],3))+
+              ', rho_HOAL_Parrot: '+str(np.round(hoal_rho_sm[0],3))+
+              ', rho_HOAL_raw_Parrot: '+str(np.round(hoal_raw_rho_sm[0],3)))
+    plt.ylabel('Volumetric Water Content [%]')
+    plt.show()
+    
+    data_together1.ix[:, data_together1.columns.difference(exclude)].plot()
+    plt.show()
+    data_together2.ix[:, data_together2.columns.difference(exclude)].plot()
+    plt.show()
 
 
 def plot_df(df, title_plant):
@@ -252,6 +311,7 @@ if __name__ == '__main__':
     # read credentials, ascat and HOAL ssm - linux paths
     cfg_path = '/media/sf_D/0_IWMI_DATASETS/FP_credentials.txt'
     ascat_ssm = pd.DataFrame.from_csv('/media/sf_D/0_IWMI_DATASETS/ascat_ssm.csv')
+    hoal_raw = read_HOAL_raw('/media/sf_D/0_IWMI_DATASETS/HOAL_raw/')
     hoal_df = read_HOAL('/media/sf_D/0_IWMI_DATASETS/HOAL/')
     
     # windows paths
@@ -275,28 +335,11 @@ if __name__ == '__main__':
                                                      cred['client_id'],
                                                      cred['client_secret'],
                                                      plant, print_results)
-            df = FPdata2df(samples, resample='H', path_out=None)
+            FP_df = FPdata2df(samples, resample='H', path_out=None)
             #plot_df(df, plant)
         except TypeError:
             break
-
-    data_together = matching(ascat_ssm, df, hoal_df)
-    ascat_rho = metrics.spearmanr(data_together['vwc_percent'].iloc[:-3], 
-                                  data_together['ssm_ascat'].iloc[:-3])
     
-    hoal_rho_sm = metrics.spearmanr(data_together['vwc_percent'].iloc[:-3], 
-                                    data_together['sm0.05'].iloc[:-3])
-    hoal_rho_ts = metrics.spearmanr(data_together['air_temperature_'+
-                                                       'celsius'].iloc[:-3], 
-                                    data_together['ts0.05'].iloc[:-3])
-    
-    print ascat_rho
-    print hoal_rho_sm
-    print hoal_rho_ts
-
-    data_together.plot()
-    plt.title('Satellite and in-situ soil moisture, temperature and sunlight'+
-              '\n HOAL Petzenkirchen')
-    plt.show()
+    calc_rho(ascat_ssm, FP_df, hoal_df, hoal_raw)
     
     print 'Finished'
