@@ -192,23 +192,27 @@ def read_NDVI_img(path, params='NDVI', lat_min=5.9180, lat_max=9.8281,
             day = int(fname[14:16])
             timestamp_array.append(datetime(year, month, day))
             folderlist = sorted(folders)
+        newpath = path
             
     else: # NDVI, LAI, SWI
         folders = os.listdir(path)
-        for fname in folders:
-            os.chdir(os.path.join(path, fname))
-            filenames = os.listdir(os.getcwd())
-            zfile = filenames[1] # always idx=1 - automatize!
-            with zipfile.ZipFile(os.path.join(path, fname, zfile), "r") as z:
-                unzip_path = ('C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATA'+
-                              'SETS\\VIs\\NDVI\\')
-                z.extractall(unzip_path)
+        unzip_path = ('C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATA'+
+                          'SETS\\VIs\\NDVI\\')
+        if not os.path.exists(unzip_path):
+            for fname in folders:
+                
+                os.chdir(os.path.join(path, fname))
+                filenames = os.listdir(os.getcwd())
+                zfile = filenames[1] # always idx=1 - automatize!
+                with zipfile.ZipFile(os.path.join(path, fname, zfile), "r") as z:
+                    z.extractall(unzip_path)
         for fname in os.listdir(unzip_path):
             year = int(fname[0:4])
             month = int(fname[4:6])
             day = int(fname[6:8])
             timestamp_array.append(datetime(year, month, day))
             folderlist = sorted(os.listdir(unzip_path))
+        newpath = unzip_path
     
     timestamp_array = np.array(timestamp_array)
     # find nearest timestamp
@@ -216,7 +220,7 @@ def read_NDVI_img(path, params='NDVI', lat_min=5.9180, lat_max=9.8281,
     date_idx = np.where(timestamp_array==nearest_date)[0]
     
     folder = np.array(sorted(folderlist))[date_idx][0]
-    fpath = os.path.join(path, folder)
+    fpath = os.path.join(newpath, folder)
     fname = fnmatch.filter(os.listdir(fpath), '*.nc')[0]
     with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
         lon = ncfile.variables['lon'][:]
