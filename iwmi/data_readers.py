@@ -14,17 +14,21 @@ import matplotlib.pyplot as plt
 def data_reader(tasks, paths):
     
     if 'img' in tasks:    
-        data_img = read_NDVI_img(paths['nc'], timestamp=datetime(2014,1,10), 
+        NDVI_img = read_NDVI_img(paths['nc'], timestamp=datetime(2014,1,10), 
                                  plot_img=True)
-    if 'ts' in tasks:
+    if 'NDVI' in tasks:
         # if HDF Error: run again
-        data_ts = read_NDVI_ts(paths['nc'], start_date=datetime(2014, 1, 1), 
+        NDVI = read_NDVI(paths['NDVI'], start_date=datetime(2014, 1, 1), 
+                               end_date=datetime(2015, 02, 28), plot_ts=True)
+    if 'NDVI300' in tasks:
+        # if HDF Error: run again
+        NDVI300 = read_NDVI300(paths['NDVI300'], start_date=datetime(2014, 1, 1), 
                                end_date=datetime(2015, 02, 28), plot_ts=True)
     if 'lc' in tasks:
-        read_LC(paths['lc'])
+        lc = read_LC(paths['lc'])
     if 'ssm' in tasks:
         #read_foxy_finn(paths['ssm'])
-        read_WARP_dataset(paths['ssm'])
+        ssm = read_WARP_dataset(paths['ssm'])
 
 
 def read_foxy_finn(ssm_path):
@@ -211,7 +215,7 @@ def read_NDVI_img(path, params='NDVI', lat_min=5.9180, lat_max=9.8281,
     return NDVI
 
 
-def read_NDVI_ts(path, params='NDVI', lon=80.5, lat=6.81, 
+def read_NDVI300(path, params='NDVI', lon=80.5, lat=6.81, 
                  start_date=datetime(2014,1,1), end_date=datetime(2014,1,31),
                  plot_ts=False):
     """
@@ -270,6 +274,10 @@ def read_NDVI_ts(path, params='NDVI', lon=80.5, lat=6.81,
     return df
 
 
+def read_NDVI():
+    pass
+
+
 def find_nearest(array, element):
     return min(array, key=lambda x: abs(x - element))
 
@@ -277,11 +285,13 @@ def find_nearest(array, element):
 if __name__ == '__main__':
     
     ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
-    ncpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\M0019604\\"
     lcpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
+    # files automatisch entpacken und ueber alle iterieren
+    ndvi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI\\NDVI_199812240000_ASIA_VGT_V1.3\\19981224\\g2_BIOPAR_NDVI_199812240000_ASIA_VGT_V1_3.nc"
+    ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
     
-    tasks = ['ssm']
-    paths = {'nc': ncpath, 'ssm': ssm_path, 'lc': lcpath}
+    tasks = ['NDVI300']
+    paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path}
     
     data_reader(tasks, paths)
     
