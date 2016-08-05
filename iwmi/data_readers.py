@@ -8,13 +8,14 @@ from pygrids.warp5 import DGGv21CPv20_ind_ld
 from rsdata.WARP.interface import WARP
 from warp_data.interface import init_grid
 import matplotlib.pyplot as plt
+import zipfile
 
 
 # Code for reading various datasets (LAI, NDVI...)
 def data_reader(tasks, paths):
     
-    if 'img' in tasks:    
-        NDVI_img = read_NDVI_img(paths['nc'], timestamp=datetime(2014,1,10), 
+    if 'NDVI_img' in tasks:    
+        NDVI_img = read_NDVI_img(paths['NDVI_img'], timestamp=datetime(2014,1,10), 
                                  plot_img=True)
     if 'NDVI' in tasks:
         # if HDF Error: run again
@@ -181,20 +182,40 @@ def read_NDVI_img(path, params='NDVI', lat_min=5.9180, lat_max=9.8281,
         Dataset
     """
 
-    folders = os.listdir(path)
     timestamp_array = []
-    for fname in sorted(folders):
-        year = int(fname[8:12])
-        month = int(fname[12:14])
-        day = int(fname[14:16])
-        timestamp_array.append(datetime(year, month, day))
+
+    if "NDVI300" in path:
+        folders = os.listdir(path)
+        for fname in sorted(folders):
+            year = int(fname[8:12])
+            month = int(fname[12:14])
+            day = int(fname[14:16])
+            timestamp_array.append(datetime(year, month, day))
+            folderlist = sorted(folders)
+            
+    else: # NDVI, LAI, SWI
+        folders = os.listdir(path)
+        for fname in folders:
+            os.chdir(os.path.join(path, fname))
+            filenames = os.listdir(os.getcwd())
+            zfile = filenames[1] # always idx=1 - automatize!
+            with zipfile.ZipFile(os.path.join(path, fname, zfile), "r") as z:
+                unzip_path = ('C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATA'+
+                              'SETS\\VIs\\NDVI\\')
+                z.extractall(unzip_path)
+        for fname in os.listdir(unzip_path):
+            year = int(fname[0:4])
+            month = int(fname[4:6])
+            day = int(fname[6:8])
+            timestamp_array.append(datetime(year, month, day))
+            folderlist = sorted(os.listdir(unzip_path))
     
     timestamp_array = np.array(timestamp_array)
     # find nearest timestamp
     nearest_date = find_nearest(timestamp_array, timestamp)
     date_idx = np.where(timestamp_array==nearest_date)[0]
     
-    folder = np.array(sorted(folders))[date_idx][0]
+    folder = np.array(sorted(folderlist))[date_idx][0]
     fpath = os.path.join(path, folder)
     fname = fnmatch.filter(os.listdir(fpath), '*.nc')[0]
     with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
@@ -287,11 +308,12 @@ if __name__ == '__main__':
     ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
     lcpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
     # files automatisch entpacken und ueber alle iterieren
-    ndvi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI\\NDVI_199812240000_ASIA_VGT_V1.3\\19981224\\g2_BIOPAR_NDVI_199812240000_ASIA_VGT_V1_3.nc"
+    ndvi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI_zipped\\"
     ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
     
-    tasks = ['NDVI300']
-    paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path}
+    tasks = ['NDVI_img']
+    paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
+             'NDVI_img': ndvi_path}
     
     data_reader(tasks, paths)
     
