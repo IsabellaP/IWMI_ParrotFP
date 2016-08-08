@@ -11,33 +11,19 @@ import matplotlib.pyplot as plt
 
 
 # Code for reading various datasets (LAI, NDVI...)
-def data_reader(datasets, paths, img=True, ts=False):
+def data_reader(datasets, paths, img=False, ts=False):
     
     for ds in datasets:
+        if ds == 'lc':
+            lc = read_LC(paths['lc'])
+        if ds == 'ssm':
+            #read_foxy_finn(paths['ssm'])
+            ssm = read_WARP_dataset(paths['ssm'])
         if img == True:
             read_img(paths[ds], ds, plot_img=True)
         if ts == True:
-            pass
-            #read_ts()
-    
-    #===========================================================================
-    # if 'NDVI_img' in tasks:    
-    #     NDVI_img = read_img(paths['NDVI'], timestamp=datetime(2014,1,10), 
-    #                         plot_img=True)
-    # if 'NDVI' in tasks:
-    #     # if HDF Error: run again
-    #     NDVI = read_NDVI(paths['NDVI'], start_date=datetime(2014, 1, 1), 
-    #                      end_date=datetime(2015, 02, 28), plot_ts=True)
-    # if 'NDVI300' in tasks:
-    #     # if HDF Error: run again
-    #     NDVI300 = read_NDVI300(paths['NDVI300'], start_date=datetime(2014, 1, 1), 
-    #                            end_date=datetime(2015, 02, 28), plot_ts=True)
-    # if 'lc' in tasks:
-    #     lc = read_LC(paths['lc'])
-    # if 'ssm' in tasks:
-    #     #read_foxy_finn(paths['ssm'])
-    #     ssm = read_WARP_dataset(paths['ssm'])
-    #===========================================================================
+            # 383459 does not work
+            read_ts(paths[ds], ds, gpi=None, plot_ts=True)        
 
 
 def read_foxy_finn(ssm_path):
@@ -155,7 +141,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     -----------
     path : str
         Path to nc-data
-    params : str, optional
+    param : str, optional
         Parameter to be read (name as in nc-files). Default: NDVI
     lat/lon_min/max : float, optional
         Bounding box coordinates, default: Sri Lanka
@@ -171,9 +157,9 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     """
 
     timestamp_array = []
+    folders = os.listdir(path)
 
     if param == 'NDVI300':
-        folders = os.listdir(path)
         for fname in sorted(folders):
             year = int(fname[8:12])
             month = int(fname[12:14])
@@ -181,7 +167,6 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
             timestamp_array.append(datetime(year, month, day))
             
     else: # NDVI, LAI, SWI
-        folders = os.listdir(path)
         for fname in sorted(folders):
             year = int(fname[0:4])
             month = int(fname[4:6])
@@ -200,6 +185,8 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     if param == 'SWI':
         # possible variables: SWI_001, 005, 010, 015, 020, 040, 060, 100
         key = 'SWI_020'
+    elif param == 'NDVI300':
+        key = 'NDVI'
     else:
         key = param
     
@@ -221,18 +208,22 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     return param_data
 
 
-def read_NDVI300(path, params='NDVI', lon=80.5, lat=6.81, 
-                 start_date=datetime(2014,1,1), end_date=datetime(2014,1,31),
-                 plot_ts=False):
+def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
+            start_date=datetime(2010,1,1), end_date=datetime(2010,3,31),
+            plot_ts=False):
     """
     Parameters:
     -----------
     path : str
         Path to nc-data
-    params : list, optional
-        List of parameters to be read. Default: NDVI
+    param : str, optional
+        Parameter to be read (name as in nc-files). Default: NDVI
     lon, lat : float, optional
-        Longitude and latitude of point of interest, default: point in Sri Lanka
+        Longitude and latitude of point of interest, default: point in Sri 
+        Lanka. Either lon and lat or gpi must be provided
+    gpi : int, optional
+        Grid Point Index, default: None. Either gpi or lon and lat must be 
+        provided. Given gpi overwrites lon and lat.
     start_date, end_date : datetime.datetime, optional
         Start and end timestamp of time series, default: January 2014
         
@@ -243,18 +234,47 @@ def read_NDVI300(path, params='NDVI', lon=80.5, lat=6.81,
     """
 
     folders = os.listdir(path)
-    timestamp = []
-    for fname in sorted(folders):
-        year = int(fname[8:12])
-        month = int(fname[12:14])
-        day = int(fname[14:16])
-        timestamp.append(datetime(year, month, day))
+    timestamp_array = []
+      
+    if param == 'NDVI300':
+        for fname in sorted(folders):
+            year = int(fname[8:12])
+            month = int(fname[12:14])
+            day = int(fname[14:16])
+            timestamp_array.append(datetime(year, month, day))
+            
+    else: # NDVI, LAI, SWI
+        for fname in sorted(folders):
+            year = int(fname[0:4])
+            month = int(fname[4:6])
+            day = int(fname[6:8])
+            timestamp_array.append(datetime(year, month, day))
     
-    timestamp = np.array(timestamp)
-    date_idx = np.where((timestamp>=start_date) & (timestamp<=end_date))[0]
+    timestamp_array = np.array(timestamp_array)
+    date_idx = np.where((timestamp_array>=start_date) & 
+                        (timestamp_array<=end_date))[0]
     
     folderlist = np.array(folders)[date_idx]
-    NDVI = []
+    
+    # init grid for lonlat/gpi conversion
+    grid_info = {'grid_class': DGGv21CPv20_ind_ld, 
+                 'grid_filename': 'C:\\Users\\i.pfeil\\Documents\\'+
+                 '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
+    grid = init_grid(grid_info)
+    
+    if gpi is not None:
+        # overwrite lon, lat if gpi given
+        lon, lat = grid.gpi2lonlat(gpi)
+    
+    param_data = []
+    if param == 'SWI':
+        # possible variables: SWI_001, 005, 010, 015, 020, 040, 060, 100
+        key = 'SWI_020'
+    elif param == 'NDVI300':
+        key = 'NDVI'
+    else:
+        key = param
+    
     for folder in sorted(folderlist):
         fpath = os.path.join(path, folder)
         fname = fnmatch.filter(os.listdir(fpath), '*.nc')[0]
@@ -267,14 +287,15 @@ def read_NDVI300(path, params='NDVI', lon=80.5, lat=6.81,
             nearest_lat = find_nearest(lats, lat)
             lon_idx = np.where(lons==nearest_lon)[0]
             lat_idx = np.where(lats==nearest_lat)[0]
-            NDVI.append(ncfile.variables['NDVI'][lat_idx, lon_idx][0][0])
+            param_data.append(ncfile.variables[key][lat_idx, lon_idx][0][0])
     
-    NDVI = np.array(NDVI)
-    df = pd.DataFrame(NDVI, index=timestamp[date_idx], columns=['NDVI'])
+    param_data = np.array(param_data)
+    df = pd.DataFrame(param_data, index=timestamp_array[date_idx], 
+                      columns=[param])
     
     if plot_ts == True:
         df.plot()
-        plt.title(params+', lon: '+str(nearest_lon)+', lat: '+str(nearest_lat))
+        plt.title(param+', lon: '+str(nearest_lon)+', lat: '+str(nearest_lat))
         plt.show()
         
     return df
@@ -294,10 +315,10 @@ if __name__ == '__main__':
     swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
     
     
-    datasets = ['SWI']
+    datasets = ['NDVI', 'LAI', 'SWI']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path}
     
-    data_reader(datasets, paths, img=True, ts=False)
+    data_reader(datasets, paths, img=False, ts=True)
     
     print 'done'
