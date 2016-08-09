@@ -22,7 +22,7 @@ def data_reader(datasets, paths, img=False, ts=False):
         if img == True:
             read_img(paths[ds], ds, plot_img=True)
         if ts == True:
-            # 383459 does not work
+            # gpi does not work
             read_ts(paths[ds], ds, gpi=None, plot_ts=True)        
 
 
@@ -134,7 +134,7 @@ def read_LC(path, lat_min=5.9180, lat_max=9.8281,
     return lccs_masked
 
 def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281, 
-            lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2014,1,1), 
+            lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2010,7,1), 
             plot_img=False):
     """
     Parameters:
@@ -262,9 +262,12 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
                  '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
     grid = init_grid(grid_info)
     
-    if gpi is not None:
-        # overwrite lon, lat if gpi given
-        lon, lat = grid.gpi2lonlat(gpi)
+    #===========================================================================
+    # if gpi is not None:
+    #     # overwrite lon, lat if gpi given
+    #===========================================================================
+    gpi = grid.find_nearest_gpi(lon, lat)[0]
+    lon, lat = grid.gpi2lonlat(gpi)
     
     param_data = []
     if param == 'SWI':
@@ -315,10 +318,10 @@ if __name__ == '__main__':
     swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
     
     
-    datasets = ['NDVI', 'LAI', 'SWI']
+    datasets = ['SWI']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path}
     
-    data_reader(datasets, paths, img=False, ts=True)
+    data_reader(datasets, paths, img=True, ts=False)
     
     print 'done'
