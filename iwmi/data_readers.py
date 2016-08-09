@@ -200,7 +200,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
         
     if plot_img == True:
         plt.figure()
-        plt.imshow(param_data)
+        plt.matshow(param_data)
         plt.colorbar()
         plt.title(param+', '+str(nearest_date))
         plt.show()
