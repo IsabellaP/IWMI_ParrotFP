@@ -54,8 +54,8 @@ def read_WARP_dataset(cfg_path):
     """Read WARP soil moisture
     """
     grid_info = {'grid_class': DGGv21CPv20_ind_ld, 
-                 'grid_filename': 'C:\\Users\\i.pfeil\\Documents\\'+
-                 '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
+                 'grid_filename': 'C:\\Users\\s.hochstoger\\Desktop'
+                                  '\\0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
     grid = init_grid(grid_info)
     WARP_io = WARP(version='IRMA1_WARP56_P2R1', parameter='ssm_userformat', 
                    cfg_path=cfg_path, grid=grid)
@@ -81,8 +81,8 @@ def read_LC(path, lat_min=5.9180, lat_max=9.8281,
     with Dataset(path, mode='r') as ncfile:
         lon = ncfile.variables['lon'][:]
         lat = ncfile.variables['lat'][:]
-        lat_idx = np.where((lat>=lat_min)&(lat<=lat_max))[0]
-        lon_idx = np.where((lon>=lon_min)&(lon<=lon_max))[0]
+        lat_idx = np.where((lat >= lat_min) & (lat <= lat_max))[0]
+        lon_idx = np.where((lon >= lon_min) & (lon <= lon_max))[0]
         lccs = ncfile.variables['lccs_class'][lat_idx, lon_idx]
 
     no_data = (lccs == 0)
@@ -133,8 +133,8 @@ def read_LC(path, lat_min=5.9180, lat_max=9.8281,
     
     return lccs_masked
 
-def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281, 
-            lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2014,1,1), 
+def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
+            lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2014, 1, 1),
             plot_img=False):
     """
     Parameters:
@@ -176,7 +176,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     timestamp_array = np.array(timestamp_array)
     # find nearest timestamp
     nearest_date = find_nearest(timestamp_array, timestamp)
-    date_idx = np.where(timestamp_array==nearest_date)[0]
+    date_idx = np.where(timestamp_array == nearest_date)[0]
     
     folder = np.array(sorted(folders))[date_idx][0]
     fpath = os.path.join(path, folder)
@@ -194,8 +194,8 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
         lon = ncfile.variables['lon'][:]
         lat = ncfile.variables['lat'][:]
         
-        lat_idx = np.where((lat>=lat_min)&(lat<=lat_max))[0]
-        lon_idx = np.where((lon>=lon_min)&(lon<=lon_max))[0]
+        lat_idx = np.where((lat >= lat_min) & (lat <= lat_max))[0]
+        lon_idx = np.where((lon >= lon_min) & (lon <= lon_max))[0]
         param_data = ncfile.variables[key][lat_idx, lon_idx]
         
     if plot_img == True:
@@ -209,7 +209,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
 
 
 def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
-            start_date=datetime(2010,1,1), end_date=datetime(2010,3,31),
+            start_date=datetime(2010, 1, 1), end_date=datetime(2010, 3, 31),
             plot_ts=False):
     """
     Parameters:
@@ -258,8 +258,8 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
     
     # init grid for lonlat/gpi conversion
     grid_info = {'grid_class': DGGv21CPv20_ind_ld, 
-                 'grid_filename': 'C:\\Users\\i.pfeil\\Documents\\'+
-                 '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
+                 'grid_filename': 'C:\\Users\\s.hochstoger\\Desktop'
+                                  '\\0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
     grid = init_grid(grid_info)
     
     if gpi is not None:
@@ -307,12 +307,12 @@ def find_nearest(array, element):
 
 if __name__ == '__main__':
     
-    ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
-    lcpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
-    ndvi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI\\"
-    ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
-    lai_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\"
-    swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
+    ssm_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
+    lcpath = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
+    ndvi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI\\"
+    ndvi300_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
+    lai_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\LAI\\"
+    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\"
     
     
     datasets = ['NDVI', 'LAI', 'SWI']
