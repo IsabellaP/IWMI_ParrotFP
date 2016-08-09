@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from netCDF4 import Dataset, num2date
 from datetime import datetime
-from pygrids.warp5 import DGGv21CPv20_ind_ld
+from pygrids.warp5 import DGGv21CPv20
 from rsdata.WARP.interface import WARP
 from warp_data.interface import init_grid
 import matplotlib.pyplot as plt
@@ -20,7 +20,7 @@ def data_reader(datasets, paths, img=False, ts=False):
             #read_foxy_finn(paths['ssm'])
             ssm = read_WARP_dataset(paths['ssm'])
         if img == True:
-            read_img(paths[ds], ds, plot_img=True)
+            read_img(paths[ds], ds, timestamp=datetime(2008,7,1), plot_img=True)
         if ts == True:
             # gpi does not work
             read_ts(paths[ds], ds, gpi=None, plot_ts=True)        
@@ -53,7 +53,7 @@ def read_foxy_finn(ssm_path):
 def read_WARP_dataset(cfg_path):
     """Read WARP soil moisture
     """
-    grid_info = {'grid_class': DGGv21CPv20_ind_ld, 
+    grid_info = {'grid_class': DGGv21CPv20, 
                  'grid_filename': 'C:\\Users\\i.pfeil\\Documents\\'+
                  '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
     grid = init_grid(grid_info)
@@ -203,7 +203,9 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
         plt.matshow(param_data)
         plt.colorbar()
         plt.title(param+', '+str(nearest_date))
-        plt.show()
+        plt.savefig("C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\"+
+                    key+"_"+str(timestamp.date())+".png")
+        plt.clf()
 
     return param_data
 
@@ -257,17 +259,15 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
     folderlist = np.array(folders)[date_idx]
     
     # init grid for lonlat/gpi conversion
-    grid_info = {'grid_class': DGGv21CPv20_ind_ld, 
+    grid_info = {'grid_class': DGGv21CPv20, 
                  'grid_filename': 'C:\\Users\\i.pfeil\\Documents\\'+
                  '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
     grid = init_grid(grid_info)
     
-    #===========================================================================
-    # if gpi is not None:
-    #     # overwrite lon, lat if gpi given
-    #===========================================================================
-    gpi = grid.find_nearest_gpi(lon, lat)[0]
-    lon, lat = grid.gpi2lonlat(gpi)
+    if gpi is not None:
+        # overwrite lon, lat if gpi given
+        gpi = grid.find_nearest_gpi(lon, lat)[0]
+        lon, lat = grid.gpi2lonlat(gpi)
     
     param_data = []
     if param == 'SWI':
@@ -318,7 +318,7 @@ if __name__ == '__main__':
     swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
     
     
-    datasets = ['SWI']
+    datasets = ['ssm']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path}
     
