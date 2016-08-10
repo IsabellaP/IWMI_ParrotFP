@@ -8,7 +8,8 @@ from pygrids.warp5 import DGGv21CPv20_ind_ld
 from rsdata.WARP.interface import WARP
 from warp_data.interface import init_grid
 import matplotlib.pyplot as plt
-
+import pytesmo.scaling as scaling
+import pytesmo.temporal_matching as temp_match
 
 # Code for reading various datasets (LAI, NDVI...)
 def data_reader(datasets, paths, img=False, ts=False):
@@ -200,7 +201,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
         
     if plot_img == True:
         plt.figure()
-        plt.imshow(param_data)
+        plt.matshow(param_data)
         plt.colorbar()
         plt.title(param+', '+str(nearest_date))
         plt.show()
@@ -208,8 +209,8 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     return param_data
 
 
-def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
-            start_date=datetime(2010, 1, 1), end_date=datetime(2010, 3, 31),
+def read_ts(path, lon, lat, param='NDVI', gpi=None,
+            start_date=datetime(2013, 1, 1), end_date=datetime(2014, 1, 31),
             plot_ts=False):
     """
     Parameters:
@@ -251,8 +252,8 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
             timestamp_array.append(datetime(year, month, day))
     
     timestamp_array = np.array(timestamp_array)
-    date_idx = np.where((timestamp_array>=start_date) & 
-                        (timestamp_array<=end_date))[0]
+    date_idx = np.where((timestamp_array >= start_date) &
+                        (timestamp_array <= end_date))[0]
     
     folderlist = np.array(folders)[date_idx]
     
@@ -269,7 +270,7 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
     param_data = []
     if param == 'SWI':
         # possible variables: SWI_001, 005, 010, 015, 020, 040, 060, 100
-        key = 'SWI_020'
+        key = 'SWI_001'
     elif param == 'NDVI300':
         key = 'NDVI'
     else:
@@ -285,21 +286,22 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
             # find nearest lonlat
             nearest_lon = find_nearest(lons, lon)
             nearest_lat = find_nearest(lats, lat)
-            lon_idx = np.where(lons==nearest_lon)[0]
-            lat_idx = np.where(lats==nearest_lat)[0]
+            lon_idx = np.where(lons == nearest_lon)[0]
+            lat_idx = np.where(lats == nearest_lat)[0]
             param_data.append(ncfile.variables[key][lat_idx, lon_idx][0][0])
     
     param_data = np.array(param_data)
     df = pd.DataFrame(param_data, index=timestamp_array[date_idx], 
                       columns=[param])
-    
-    if plot_ts == True:
-        df.plot()
-        plt.title(param+', lon: '+str(nearest_lon)+', lat: '+str(nearest_lat))
-        plt.show()
-        
+    print nearest_lon
+    print nearest_lat
     return df
 
+def plot_alltogether(swi, ndvi, lai):
+
+    matched_data = temp_match.matching(swi, ndvi, lai)
+    scaled_data = scaling.scale(matched_data, method="mean_std")
+    scaled_data.plot(figsize=(15, 5))
 
 def find_nearest(array, element):
     return min(array, key=lambda x: abs(x - element))
@@ -313,12 +315,30 @@ if __name__ == '__main__':
     ndvi300_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
     lai_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\LAI\\"
     swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\"
-    
-    
+
+
     datasets = ['NDVI', 'LAI', 'SWI']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path}
     
-    data_reader(datasets, paths, img=False, ts=True)
-    
+    #data_reader(datasets, paths, img=False, ts=True)
+
+    ndvi1 = read_ts(ndvi_path, lon=80.80, param='NDVI', lat=8.5,
+                   start_date=datetime(2013, 1, 1), end_date=datetime(2014, 1, 1))
+    ndvi2 = read_ts(ndvi_path, lon=80.80, lat=8.51, param='NDVI',
+                   start_date=datetime(2013, 1, 1), end_date=datetime(2014, 1, 1))
+    ndvi3 = read_ts(ndvi_path, lon=80.80, lat=8.49, param='NDVI',
+                   start_date=datetime(2013, 1, 1), end_date=datetime(2014, 1, 1))
+    swi = read_ts(swi_path, lon=80.80, lat=8.5, param='SWI',
+                   start_date=datetime(2013, 1, 1), end_date=datetime(2014, 1, 1))
+    #lai = read_ts(lai_path, param='LAI')
+    #ndvi.plot()
+    swi.plot(ylim=(0, 100))
+    ndvi1.plot(ylim=(0, 1))
+    ndvi2.plot(ylim=(0, 1))
+    ndvi3.plot(ylim=(0, 1))
+    #lai.plot()
+    #plot(swi, ndvi, lai)
+    plt.show()
+
     print 'done'
