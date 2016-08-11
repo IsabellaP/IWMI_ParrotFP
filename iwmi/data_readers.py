@@ -8,6 +8,9 @@ from pygrids.warp5 import DGGv21CPv20
 from rsdata.WARP.interface import WARP
 from warp_data.interface import init_grid
 import matplotlib.pyplot as plt
+import pytesmo.scaling as scaling
+import pytesmo.temporal_matching as temp_match
+import pytesmo.metrics as metrics
 
 
 # Code for reading various datasets (LAI, NDVI...)
@@ -20,10 +23,11 @@ def data_reader(datasets, paths, img=False, ts=False):
             #read_foxy_finn(paths['ssm'])
             ssm = read_WARP_dataset(paths['ssm'])
         if img == True:
-            read_img(paths[ds], ds, timestamp=datetime(2008,7,1), plot_img=True)
+            for year in range(2007, 2014):
+                for month in range(1, 13):
+                    read_img(paths[ds], ds, timestamp=datetime(year,month,1), plot_img=True)
         if ts == True:
-            # gpi does not work
-            read_ts(paths[ds], ds, gpi=None, plot_ts=True)        
+            read_ts(paths[ds], ds, gpi=389821, plot_ts=True)        
 
 
 def read_foxy_finn(ssm_path):
@@ -200,11 +204,12 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
         
     if plot_img == True:
         plt.figure()
-        plt.matshow(param_data)
+        plt.matshow(param_data, fignum=False)
         plt.colorbar()
         plt.title(param+', '+str(nearest_date))
+        #plt.show()
         plt.savefig("C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\"+
-                    key+"_"+str(timestamp.date())+".png")
+                     key+"_"+str(timestamp.date())+".png")
         plt.clf()
 
     return param_data
@@ -212,7 +217,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
 
 def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
             start_date=datetime(2010,1,1), end_date=datetime(2010,3,31),
-            plot_ts=False):
+            plot_ts=False, swi_param='SWI_001'):
     """
     Parameters:
     -----------
@@ -228,6 +233,8 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
         provided. Given gpi overwrites lon and lat.
     start_date, end_date : datetime.datetime, optional
         Start and end timestamp of time series, default: January 2014
+    swi_param : str, optional
+        possible variables: SWI_001, 005, 010, 015, 020, 040, 060, 100
         
     Returns:
     --------
@@ -266,13 +273,11 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
     
     if gpi is not None:
         # overwrite lon, lat if gpi given
-        gpi = grid.find_nearest_gpi(lon, lat)[0]
         lon, lat = grid.gpi2lonlat(gpi)
     
     param_data = []
     if param == 'SWI':
-        # possible variables: SWI_001, 005, 010, 015, 020, 040, 060, 100
-        key = 'SWI_020'
+        key = swi_param
     elif param == 'NDVI300':
         key = 'NDVI'
     else:
@@ -294,7 +299,7 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
     
     param_data = np.array(param_data)
     df = pd.DataFrame(param_data, index=timestamp_array[date_idx], 
-                      columns=[param])
+                      columns=[key])
     
     if plot_ts == True:
         df.plot()
@@ -304,24 +309,147 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
     return df
 
 
+def plot_alltogether(gpi, ts1, ts2, *args):
+
+    matched_data = temp_match.matching(ts1, ts2, *args)
+    if len(matched_data) == 0:
+        print "Empty dataset."
+        return
+    scaled_data = scaling.scale(matched_data, method="mean_std")
+    scaled_data.plot(figsize=(15, 5))
+    plt.title('SWI and Vegetation indices comparison (rescaled)')
+    #plt.show()
+    plt.savefig("C:\\Users\\i.pfeil\\Desktop\\TS_plots\\"+str(gpi)+".png")
+    plt.clf()
+
+
+def corr(paths, gpi, start_date, end_date, plot_fig=False):
+    
+    swi_path = paths['SWI']
+    lai_path = paths['LAI']
+    ndvi_path = paths['NDVI']
+    #fapar_path = paths['FAPAR']
+    
+    swi1 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+                   end_date=end_date, swi_param='SWI_001')
+    #===========================================================================
+    # swi2 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+    #                end_date=end_date, swi_param='SWI_010')
+    # swi3 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+    #                end_date=end_date, swi_param='SWI_020')
+    # swi4 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+    #                end_date=end_date, swi_param='SWI_040')
+    # swi5 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+    #                end_date=end_date, swi_param='SWI_060')
+    #===========================================================================
+    swi6 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+                   end_date=end_date, swi_param='SWI_100')
+    
+    lai = read_ts(lai_path, gpi=gpi, param='LAI', start_date=start_date,
+                   end_date=end_date)
+    ndvi = read_ts(ndvi_path, gpi=gpi, param='NDVI', start_date=start_date,
+                   end_date=end_date)
+    #===========================================================================
+    # fapar = read_ts(fapar_path, gpi=gpi, param='FAPAR', start_date=start_date,
+    #                end_date=end_date)
+    #===========================================================================
+
+    if plot_fig:
+        print gpi
+        plot_alltogether(gpi, swi1, swi6, ndvi, lai)
+    
+    #===========================================================================
+    # water = {'SWI_001': swi1, 'SWI_010': swi2, 'SWI_020': swi3, 
+    #          'SWI_040': swi4, 'SWI_060': swi5, 'SWI_100': swi6}
+    # vegetation = {'NDVI': ndvi, 'LAI': lai, 'FAPAR': fapar} 
+    # 
+    # print('gpi '+str(gpi))
+    # print start_date, end_date
+    # for ds_water in sorted(water.keys()):
+    #     for ds_veg in vegetation.keys():
+    #         data_together = temp_match.matching(water[ds_water], 
+    #                                             vegetation[ds_veg])
+    #         rho = metrics.spearmanr(data_together[ds_water], 
+    #                                 data_together[ds_veg])
+    #         print ds_water, ds_veg, rho
+    #===========================================================================
+            
+
 def find_nearest(array, element):
     return min(array, key=lambda x: abs(x - element))
 
 
+def zribi(paths, gpi, start_date, end_date, plot_fig=False):
+    
+    swi_path = paths['SWI']
+    ndvi_path = paths['NDVI']
+    
+    swi = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+                  end_date=end_date, swi_param='SWI_100')['SWI_100']
+    
+    ndvi = read_ts(ndvi_path, gpi=gpi, param='NDVI', start_date=start_date,
+                   end_date=end_date)
+                   
+    dndvi = np.ediff1d(ndvi, to_end=np.NaN)
+    ndvi['D_NDVI'] = pd.Series(dndvi, index=ndvi.index)
+    matched_data = temp_match.matching(swi, ndvi)
+    
+    grouped_data = matched_data.groupby([matched_data.index.month, 
+                                         matched_data.index.day])
+    
+    kd = []
+    for key, _ in grouped_data:
+        x = grouped_data['SWI_100'].get_group(key)
+        y = grouped_data['D_NDVI'].get_group(key)
+        k, d = np.polyfit(x, y, 1)
+        plt.plot(x, y, '*')
+        plt.plot(np.arange(100), np.arange(100)*k+d, "r")
+        plt.title('Month, Day: '+str(key)+', f(x) = '+str(round(k, 3))+
+                  '*x + '+str(round(d, 3)))
+        plt.xlabel('SWI_100')
+        plt.ylabel('D_NDVI')
+        plt.show()
+    
+#===============================================================================
+#     # simulation
+#     ndvi_sim = [ndvi[0]]
+#     for i in range(1,len(swi)+1):
+#         # a und b herausfinden - Ausgleich
+#         a = 0.28
+#         b = -0.028
+#         ndvi_sim.append(ndvi_sim[i-1] + a*swi[i] + b)
+# 
+#     return ndvi_sim
+#===============================================================================
+
+
 if __name__ == '__main__':
     
+    # read Sri Lanka gpis
+    gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_Sri Lanka_warp.csv"
+    gpis_df = pd.read_csv(gpi_path)
+    
+    # set paths to datasets
     ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
     lcpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
     ndvi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI\\"
     ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
     lai_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\"
     swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
+    fapar_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
     
-    
-    datasets = ['ssm']
+    datasets = ['FAPAR']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
-             'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path}
+             'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path, 
+             'FAPAR': fapar_path}
     
-    data_reader(datasets, paths, img=True, ts=False)
+    #data_reader(datasets, paths, img=True, ts=False)
     
+    start_date = datetime(2007, 1, 1)
+    end_date = datetime(2014, 1, 1)
+    for gpi in gpis_df['point']:
+        gpi = 542129
+        zribi(paths, gpi, start_date, end_date)
+        #corr(paths, gpi, start_date, end_date, plot_fig=True)
+       
     print 'done'

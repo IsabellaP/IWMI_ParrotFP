@@ -15,10 +15,7 @@ def unzip(path_in, path_out):
 
 if __name__ == '__main__':
     
-    #path_in = 'C:\Users\s.hochstoger\Desktop\\0_IWMI_DATASETS\VIs\LAI_zipped'
-    #path_out = 'C:\Users\s.hochstoger\Desktop\\0_IWMI_DATASETS\VIs\LAI'
-    
-    path_in = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI_zipped\\'
-    path_out = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\'
+    path_in = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR_zipped'
+    path_out = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR'
     
     unzip(path_in, path_out)

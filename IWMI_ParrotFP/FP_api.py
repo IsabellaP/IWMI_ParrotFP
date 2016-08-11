@@ -8,6 +8,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from pytesmo.temporal_matching import matching
+from pytesmo.scaling import scale
 import pytesmo.metrics as metrics
 
 
@@ -255,6 +256,23 @@ def read_HOAL_raw(path):
     return box22_df
 
 
+def rescale_df(ascat_ssm, FP_df):
+    ascat_ssm['ssm_ascat'] = ascat_ssm['ssm_ascat']*0.54
+    ascat_ssm.plot()
+    plt.show()
+    
+    matched_data = matching(ascat_ssm, FP_df['Parrot_vwc'])
+    matched_data.plot()
+    plt.show()
+    
+    scaled_data = scale(matched_data, method="mean_std")
+    
+    scaled_data.plot()
+    plt.title('Satellite and in-situ soil moisture, HOAL Petzenkirchen')
+    plt.ylabel('Volumetric Water Content [%]')
+    plt.show()
+
+
 def calc_rho(ascat_ssm, FP_df, hoal_df, hoal_raw):
     # multiply ASCAT with porosity (0.54) to get same units
     ascat_ssm['ssm_ascat'] = ascat_ssm['ssm_ascat']*0.54
@@ -309,10 +327,19 @@ def plot_df(df, title_plant):
 
 if __name__ == '__main__':
     # read credentials, ascat and HOAL ssm - linux paths
-    cfg_path = '/media/sf_D/0_IWMI_DATASETS/FP_credentials.txt'
-    ascat_ssm = pd.DataFrame.from_csv('/media/sf_D/0_IWMI_DATASETS/ascat_ssm.csv')
-    hoal_raw = read_HOAL_raw('/media/sf_D/0_IWMI_DATASETS/HOAL_raw/')
-    hoal_df = read_HOAL('/media/sf_D/0_IWMI_DATASETS/HOAL/')
+    #cfg_path = '/media/sf_D/0_IWMI_DATASETS/FP_credentials.txt'
+    #ascat_ssm = pd.DataFrame.from_csv('/media/sf_D/0_IWMI_DATASETS/ascat_ssm.csv')
+    #hoal_raw = read_HOAL_raw('/media/sf_D/0_IWMI_DATASETS/HOAL_raw/')
+    #hoal_df = read_HOAL('/media/sf_D/0_IWMI_DATASETS/HOAL/')
+    
+    # IWMI paths
+    cfg_path = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\FP_credentials.txt'
+    ascat_ssm = pd.DataFrame.from_csv('C:\\Users\\i.pfeil\\Documents\\'+
+                                      '0_IWMI_DATASETS\\ascat_ssm.csv')
+    #hoal_raw = read_HOAL_raw('C:\\Users\\i.pfeil\\Documents\\'+
+    #                         '0_IWMI_DATASETS\\HOAL_raw\\')
+    #hoal_df = read_HOAL('C:\\Users\\i.pfeil\\Documents\\'+
+    #                    '0_IWMI_DATASETS\\HOAL\\')
     
     # windows paths
     #cfg_path = 'D:\IWMI\FP_credentials.txt'
@@ -340,6 +367,7 @@ if __name__ == '__main__':
         except TypeError:
             break
     
-    calc_rho(ascat_ssm, FP_df, hoal_df, hoal_raw)
+    rescale_df(ascat_ssm, FP_df)
+    #calc_rho(ascat_ssm, FP_df, hoal_df, hoal_raw)
     
     print 'Finished'
