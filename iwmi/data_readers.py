@@ -397,30 +397,38 @@ def zribi(paths, gpi, start_date, end_date, plot_fig=False):
     grouped_data = matched_data.groupby([matched_data.index.month, 
                                          matched_data.index.day])
     
-    kd = []
+    kd = {}
     for key, _ in grouped_data:
         x = grouped_data['SWI_100'].get_group(key)
         y = grouped_data['D_NDVI'].get_group(key)
         k, d = np.polyfit(x, y, 1)
-        plt.plot(x, y, '*')
-        plt.plot(np.arange(100), np.arange(100)*k+d, "r")
-        plt.title('Month, Day: '+str(key)+', f(x) = '+str(round(k, 3))+
-                  '*x + '+str(round(d, 3)))
-        plt.xlabel('SWI_100')
-        plt.ylabel('D_NDVI')
-        plt.show()
+        kd[key] = [k, d]
+        if plot_fig:
+            plt.plot(x, y, '*')
+            plt.plot(np.arange(100), np.arange(100)*k+d, "r")
+            plt.title('Month, Day: '+str(key)+', f(x) = '+str(round(k, 3))+
+                      '*x + '+str(round(d, 3)))
+            plt.xlabel('SWI_100')
+            plt.ylabel('D_NDVI')
+            plt.show()
     
-#===============================================================================
-#     # simulation
-#     ndvi_sim = [ndvi[0]]
-#     for i in range(1,len(swi)+1):
-#         # a und b herausfinden - Ausgleich
-#         a = 0.28
-#         b = -0.028
-#         ndvi_sim.append(ndvi_sim[i-1] + a*swi[i] + b)
-# 
-#     return ndvi_sim
-#===============================================================================
+    # simulation
+    ndvi_sim = [ndvi['NDVI'][0]]
+    for i in range(1,len(matched_data)):
+        # stimmt index i-1
+        k, d = kd[(matched_data.index[i].month, matched_data.index[i].day)]
+        ndvi_sim.append(ndvi_sim[i-1] + k*matched_data['SWI_100'][i] + d)
+    
+    results = pd.DataFrame(matched_data['SWI_100'].values, columns=['SWI_100'],
+                           index=matched_data.index)
+    results['NDVI'] = pd.Series(matched_data['NDVI'].values*100, 
+                                index=matched_data.index)
+    results['NDVI_sim'] = pd.Series(np.multiply(ndvi_sim, 100), 
+                                    index=matched_data.index)
+    results.plot()
+    plt.show()
+    
+    return ndvi_sim
 
 
 if __name__ == '__main__':
@@ -447,9 +455,9 @@ if __name__ == '__main__':
     
     start_date = datetime(2007, 1, 1)
     end_date = datetime(2014, 1, 1)
-    for gpi in gpis_df['point']:
-        gpi = 542129
-        zribi(paths, gpi, start_date, end_date)
-        #corr(paths, gpi, start_date, end_date, plot_fig=True)
+    #for gpi in gpis_df['point']:
+    gpi = 542129
+    zribi(paths, gpi, start_date, end_date, plot_fig=False)
+    #corr(paths, gpi, start_date, end_date, plot_fig=True)
        
     print 'done'
