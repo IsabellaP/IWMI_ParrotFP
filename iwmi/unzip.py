@@ -1,4 +1,5 @@
 import os
+import shutil
 import zipfile
 
 
@@ -12,10 +13,23 @@ def unzip(path_in, path_out):
         zip_ref.extractall(path_out)
         zip_ref.close()
         
+        
+def format_to_folder(root, formatstr, out_path):
+    
+    for path, _, files in os.walk(root):
+        for name in files:
+            if formatstr in name:
+                shutil.copyfile(os.path.join(path, name), os.path.join(out_path, name))
+
 
 if __name__ == '__main__':
     
-    path_in = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR_zipped'
-    path_out = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR'
+    #path_in = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR_zipped'
+    #path_out = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR'
     
-    unzip(path_in, path_out)
+    #unzip(path_in, path_out)
+    
+    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI'
+    formatstr = '.tiff'
+    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\NDVI'
+    format_to_folder(root, formatstr, out_path)

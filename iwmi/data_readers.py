@@ -381,11 +381,12 @@ def find_nearest(array, element):
 
 def zribi(paths, gpi, start_date, end_date, plot_fig=False):
     
+    t_val = 'SWI_060'
     swi_path = paths['SWI']
     ndvi_path = paths['NDVI']
     
     swi = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-                  end_date=end_date, swi_param='SWI_100')['SWI_100']
+                  end_date=end_date, swi_param=t_val)[t_val]
     
     ndvi = read_ts(ndvi_path, gpi=gpi, param='NDVI', start_date=start_date,
                    end_date=end_date)
@@ -394,12 +395,13 @@ def zribi(paths, gpi, start_date, end_date, plot_fig=False):
     ndvi['D_NDVI'] = pd.Series(dndvi, index=ndvi.index)
     matched_data = temp_match.matching(swi, ndvi)
     
-    grouped_data = matched_data.groupby([matched_data.index.month, 
-                                         matched_data.index.day])
+    # calculate parameters k and d only from 2007-2010 data
+    grouped_data = matched_data['2007':'2010'].groupby([matched_data['2007':'2010'].index.month, 
+                                                        matched_data['2007':'2010'].index.day])
     
     kd = {}
     for key, _ in grouped_data:
-        x = grouped_data['SWI_100'].get_group(key)
+        x = grouped_data[t_val].get_group(key)
         y = grouped_data['D_NDVI'].get_group(key)
         k, d = np.polyfit(x, y, 1)
         kd[key] = [k, d]
@@ -408,24 +410,31 @@ def zribi(paths, gpi, start_date, end_date, plot_fig=False):
             plt.plot(np.arange(100), np.arange(100)*k+d, "r")
             plt.title('Month, Day: '+str(key)+', f(x) = '+str(round(k, 3))+
                       '*x + '+str(round(d, 3)))
-            plt.xlabel('SWI_100')
+            plt.xlabel(t_val)
             plt.ylabel('D_NDVI')
             plt.show()
     
     # simulation
     ndvi_sim = [ndvi['NDVI'][0]]
     for i in range(1,len(matched_data)):
+        print matched_data.index[i]
         # stimmt index i-1
-        k, d = kd[(matched_data.index[i].month, matched_data.index[i].day)]
-        ndvi_sim.append(ndvi_sim[i-1] + k*matched_data['SWI_100'][i] + d)
+        try:
+            k, d = kd[(matched_data.index[i].month, matched_data.index[i].day)]
+        except KeyError:
+            ndvi_sim.append(ndvi_sim[i-1])
+            print 'no k, d values for '+str((matched_data.index[i].month, matched_data.index[i].day))
+            continue
+        ndvi_sim.append(ndvi_sim[i-1] + k*matched_data[t_val][i] + d)
     
-    results = pd.DataFrame(matched_data['SWI_100'].values, columns=['SWI_100'],
+    results = pd.DataFrame(matched_data[t_val].values, columns=[t_val],
                            index=matched_data.index)
     results['NDVI'] = pd.Series(matched_data['NDVI'].values*100, 
                                 index=matched_data.index)
     results['NDVI_sim'] = pd.Series(np.multiply(ndvi_sim, 100), 
                                     index=matched_data.index)
     results.plot()
+    plt.title(str(gpi)+', t value: '+t_val)
     plt.show()
     
     return ndvi_sim
@@ -456,7 +465,9 @@ if __name__ == '__main__':
     start_date = datetime(2007, 1, 1)
     end_date = datetime(2014, 1, 1)
     #for gpi in gpis_df['point']:
-    gpi = 542129
+    gpi = 472463
+    gpi = 466121
+    gpi = 485159
     zribi(paths, gpi, start_date, end_date, plot_fig=False)
     #corr(paths, gpi, start_date, end_date, plot_fig=True)
        
