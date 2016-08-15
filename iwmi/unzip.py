@@ -4,6 +4,8 @@ import zipfile
 
 
 def unzip(path_in, path_out):
+    """ Unzips folders from path_in to path_out 
+    """
         
     folders = os.listdir(path_in)
     
@@ -15,11 +17,15 @@ def unzip(path_in, path_out):
         
         
 def format_to_folder(root, formatstr, out_path):
+    """ Looks for files of format formatstr in all subfolders of root and moves
+    the files to out_path
+    """
     
     for path, _, files in os.walk(root):
         for name in files:
             if formatstr in name:
-                shutil.copyfile(os.path.join(path, name), os.path.join(out_path, name))
+                shutil.copyfile(os.path.join(path, name), 
+                                os.path.join(out_path, name))
 
 
 if __name__ == '__main__':
@@ -29,7 +35,7 @@ if __name__ == '__main__':
     
     #unzip(path_in, path_out)
     
-    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI'
+    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI'
     formatstr = '.tiff'
-    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\NDVI'
+    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\SWI'
     format_to_folder(root, formatstr, out_path)
