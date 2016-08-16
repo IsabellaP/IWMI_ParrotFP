@@ -18,7 +18,7 @@ def data_reader(datasets, paths, img=False, ts=False):
     
     for ds in datasets:
         if ds == 'lc':
-            lc = read_LC(paths['lc'])
+            lc = read_LC(paths['lc'])#, lat_min=5.9180, lat_max=35.5,lon_min=68, lon_max=97)
         if ds == 'ssm':
             #read_foxy_finn(paths['ssm'])
             ssm = read_WARP_dataset(paths['ssm'])
@@ -414,18 +414,26 @@ def zribi(paths, gpi, start_date, end_date, plot_fig=False):
             plt.ylabel('D_NDVI')
             plt.show()
     
-    # simulation
+    # simulation - integrate forecast length
     ndvi_sim = [ndvi['NDVI'][0]]
     for i in range(1,len(matched_data)):
-        print matched_data.index[i]
-        # stimmt index i-1
+        print i, matched_data.index[i]
         try:
             k, d = kd[(matched_data.index[i].month, matched_data.index[i].day)]
         except KeyError:
             ndvi_sim.append(ndvi_sim[i-1])
             print 'no k, d values for '+str((matched_data.index[i].month, matched_data.index[i].day))
             continue
-        ndvi_sim.append(ndvi_sim[i-1] + k*matched_data[t_val][i] + d)
+        
+        prev_date = (matched_data.index[i]-matched_data.index[i-1]).days
+        if prev_date > 20: # days to latest available ndvi value
+            ndvi_prev = np.NaN # NaN if latest ndvi value is older than prev_date
+        else:
+            # use ndvi instead of ndvi_sim to keep the forecast_length of 10 days
+            ndvi_prev = matched_data['NDVI'][i-1]
+        ndvi_sim1 = ndvi_prev + k*matched_data[t_val][i] + d
+        print ndvi_prev, k, d, ndvi_sim1
+        ndvi_sim.append(ndvi_sim1)
     
     results = pd.DataFrame(matched_data[t_val].values, columns=[t_val],
                            index=matched_data.index)
@@ -455,19 +463,19 @@ if __name__ == '__main__':
     swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
     fapar_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
     
-    datasets = ['FAPAR']
+    datasets = ['NDVI']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path, 
              'FAPAR': fapar_path}
     
-    #data_reader(datasets, paths, img=True, ts=False)
+    #data_reader(datasets, paths)
     
-    start_date = datetime(2007, 1, 1)
-    end_date = datetime(2014, 1, 1)
+    start_date = datetime(2007, 7, 1)
+    end_date = datetime(2009, 7, 1)
     #for gpi in gpis_df['point']:
     gpi = 472463
     gpi = 466121
-    gpi = 485159
+    #gpi = 485159
     zribi(paths, gpi, start_date, end_date, plot_fig=False)
     #corr(paths, gpi, start_date, end_date, plot_fig=True)
        

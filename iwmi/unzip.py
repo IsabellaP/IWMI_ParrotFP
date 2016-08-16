@@ -35,7 +35,7 @@ if __name__ == '__main__':
     
     #unzip(path_in, path_out)
     
-    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI'
+    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR'
     formatstr = '.tiff'
-    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\SWI'
+    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\FAPAR'
     format_to_folder(root, formatstr, out_path)
