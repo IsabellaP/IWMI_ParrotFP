@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 
 from data_readers import read_ts 
@@ -10,7 +10,7 @@ import pytesmo.temporal_matching as temp_match
 import pytesmo.metrics as metrics
 
 
-def plot_alltogether(gpi, ts1, ts2, *args):
+def plot_alltogether(time_lag, gpi, ts1, ts2, *args):
 
     matched_data = temp_match.matching(ts1, ts2, *args)
     if len(matched_data) == 0:
@@ -20,60 +20,71 @@ def plot_alltogether(gpi, ts1, ts2, *args):
     scaled_data.plot(figsize=(15, 5))
     plt.title('SWI and Vegetation indices comparison (rescaled)')
     #plt.show()
-    plt.savefig("C:\\Users\\i.pfeil\\Desktop\\TS_plots\\"+str(gpi)+".png")
+    plt.savefig("C:\\Users\\i.pfeil\\Desktop\\TS_plots\\"+str(gpi)+"_"+
+                str(time_lag)+".png")
     plt.clf()
 
 
-def corr(paths, gpi, start_date, end_date, plot_fig=False):
+def corr(paths, gpi, corr_df, start_date, end_date, time_lag=0, plot_fig=False):
     
     swi_path = paths['SWI']
     lai_path = paths['LAI']
-    ndvi_path = paths['NDVI']
+    #ndvi_path = paths['NDVI']
     #fapar_path = paths['FAPAR']
     
     swi1 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
                    end_date=end_date, swi_param='SWI_001')
-    #===========================================================================
-    # swi2 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-    #                end_date=end_date, swi_param='SWI_010')
-    # swi3 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-    #                end_date=end_date, swi_param='SWI_020')
-    # swi4 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-    #                end_date=end_date, swi_param='SWI_040')
-    # swi5 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-    #                end_date=end_date, swi_param='SWI_060')
-    #===========================================================================
+    swi2 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+                   end_date=end_date, swi_param='SWI_010')
+    swi3 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+                   end_date=end_date, swi_param='SWI_020')
+    swi4 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+                   end_date=end_date, swi_param='SWI_040')
+    swi5 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+                   end_date=end_date, swi_param='SWI_060')
     swi6 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
                    end_date=end_date, swi_param='SWI_100')
     
     lai = read_ts(lai_path, gpi=gpi, param='LAI', start_date=start_date,
                    end_date=end_date)
-    ndvi = read_ts(ndvi_path, gpi=gpi, param='NDVI', start_date=start_date,
-                   end_date=end_date)
     #===========================================================================
+    # ndvi = read_ts(ndvi_path, gpi=gpi, param='NDVI', start_date=start_date,
+    #                end_date=end_date)
     # fapar = read_ts(fapar_path, gpi=gpi, param='FAPAR', start_date=start_date,
     #                end_date=end_date)
     #===========================================================================
+    
+    # insert time lag
+    if time_lag > 0:
+        lai_idx = lai.index + timedelta(days=time_lag)
+        lai = pd.DataFrame(lai.values, columns=['LAI'], index=lai_idx)
 
     if plot_fig:
         print gpi
-        plot_alltogether(gpi, swi1, swi6, ndvi, lai)
+        plot_alltogether(time_lag, gpi, swi1, swi2, swi3, swi4, swi5, swi6, lai)
     
-    #===========================================================================
-    # water = {'SWI_001': swi1, 'SWI_010': swi2, 'SWI_020': swi3, 
-    #          'SWI_040': swi4, 'SWI_060': swi5, 'SWI_100': swi6}
-    # vegetation = {'NDVI': ndvi, 'LAI': lai, 'FAPAR': fapar} 
-    # 
-    # print('gpi '+str(gpi))
-    # print start_date, end_date
-    # for ds_water in sorted(water.keys()):
-    #     for ds_veg in vegetation.keys():
-    #         data_together = temp_match.matching(water[ds_water], 
-    #                                             vegetation[ds_veg])
-    #         rho = metrics.spearmanr(data_together[ds_water], 
-    #                                 data_together[ds_veg])
-    #         print ds_water, ds_veg, rho
-    #===========================================================================
+    water = {'SWI_001': swi1, 'SWI_010': swi2, 'SWI_020': swi3, 
+             'SWI_040': swi4, 'SWI_060': swi5, 'SWI_100': swi6}
+    vegetation = {'LAI': lai}#, 'NDVI': ndvi, 'FAPAR': fapar} 
+
+    for ds_veg in vegetation.keys():
+        for ds_water in sorted(water.keys()):
+            data_together = temp_match.matching(water[ds_water], 
+                                                vegetation[ds_veg])
+            rho, p = metrics.spearmanr(data_together[ds_water], 
+                                    data_together[ds_veg])
+            if ds_veg+'_'+ds_water+'_rho' in corr_df.columns:
+                corr_df[ds_veg+'_'+ds_water+'_rho'].iloc[np.where(corr_df.index==
+                                                              time_lag)] = rho
+                corr_df[ds_veg+'_'+ds_water+'_p'].iloc[np.where(corr_df.index==
+                                                            time_lag)] = p
+            else:
+                corr_df[ds_veg+'_'+ds_water+'_rho'] = pd.Series(rho, 
+                                                                index=[time_lag])
+                corr_df[ds_veg+'_'+ds_water+'_p'] = pd.Series(p, 
+                                                              index=[time_lag])
+    
+    return corr_df
             
 
 def zribi(paths, gpi, start_date, end_date, plot_fig=False, monthly=False):
@@ -103,10 +114,6 @@ def zribi(paths, gpi, start_date, end_date, plot_fig=False, monthly=False):
 #     swi['SWI_020'] = y[:len(swi)]
 #     ndvi['NDVI'] = y2[:len(ndvi)]
 #===============================================================================
-    
-    #swi.plot()
-    #ndvi.plot()
-    #plt.show()
                    
     dndvi = np.ediff1d(ndvi, to_end=np.NaN)
     ndvi['D_NDVI'] = pd.Series(dndvi, index=ndvi.index)
@@ -174,13 +181,11 @@ def zribi(paths, gpi, start_date, end_date, plot_fig=False, monthly=False):
     return ndvi_sim
 
 
-
-
 if __name__ == '__main__':
     
     # read Sri Lanka gpis
-    gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_Sri Lanka_warp.csv"
-    gpis_df = pd.read_csv(gpi_path)
+    #gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_Sri Lanka_warp.csv"
+    #gpis_df = pd.read_csv(gpi_path)
     
     # set paths to datasets
     ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
@@ -191,21 +196,37 @@ if __name__ == '__main__':
     swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
     fapar_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
     
-    datasets = ['NDVI']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path, 
              'FAPAR': fapar_path}
     
     #data_reader(datasets, paths)
     
-    start_date = datetime(2007, 1, 1)
-    end_date = datetime(2013, 1, 1)
-    #for gpi in gpis_df['point']:
-    #gpi = 472463
-    #gpi = 466121
-    gpi = 485159
+    start_date = datetime(2008, 1, 1)
+    end_date = datetime(2009, 1, 1)
+
     gpi = 1057207
-    zribi(paths, gpi, start_date, end_date, plot_fig=False, monthly=True)
-    #corr(paths, gpi, start_date, end_date, plot_fig=True)
-       
+    gpi = 1032891
+    #zribi(paths, gpi, start_date, end_date, plot_fig=False, monthly=True)
+    
+    time_lags = [0, 1, 3, 7, 10, 15, 20, 45]
+    corr_df = pd.DataFrame([], index=time_lags)
+    for time_lag in time_lags:
+        print time_lag
+        corr_df = corr(paths, gpi, corr_df, start_date, end_date, 
+                       time_lag=time_lag, plot_fig=True)
+    
+    print corr_df
+    plot_cols = []
+    for col in corr_df.columns:
+        if 'rho' in col:
+            plot_cols.append(col)
+    
+    plot_df = corr_df[plot_cols]
+    plot_df.plot()
+    plt.title(str(gpi))
+    plt.xlabel("Time lag between datasets [days]")
+    plt.ylabel("Spearman's Rho")
+    plt.show()
+    
     print 'done'
