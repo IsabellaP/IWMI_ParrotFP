@@ -80,6 +80,6 @@ p.add_source(name, filename, filedate, temp_res, host, protocol,
 # for all sources:
 begin = datetime(2007,7,1)
 end = datetime(2010,12,31)
-p.resample(begin=begin, end=end)
+#p.resample(begin=begin, end=end)
 
 p.start_app()

@@ -16,13 +16,19 @@ def plot_alltogether(time_lag, gpi, ts1, ts2, *args):
     if len(matched_data) == 0:
         print "Empty dataset."
         return
-    scaled_data = scaling.scale(matched_data, method="mean_std")
-    scaled_data.plot(figsize=(15, 5))
+    #scaled_data = scaling.scale(matched_data, method="mean_std")
+    matched_data.plot(figsize=(15, 5))
     plt.title('SWI and Vegetation indices comparison (rescaled)')
     #plt.show()
     plt.savefig("C:\\Users\\i.pfeil\\Desktop\\TS_plots\\"+str(gpi)+"_"+
                 str(time_lag)+".png")
     plt.clf()
+
+
+def rescale_peng(vi, vi_min, vi_max):
+    
+    vi_resc = (vi - vi_min) / (vi_max - vi_min) * 100
+    return vi_resc
 
 
 def corr(paths, gpi, corr_df, start_date, end_date, time_lag=0, plot_fig=False):
@@ -54,6 +60,11 @@ def corr(paths, gpi, corr_df, start_date, end_date, time_lag=0, plot_fig=False):
     #                end_date=end_date)
     #===========================================================================
     
+    # rescale LAI before further processing
+    lai = rescale_peng(lai, lai.min(), lai.max())
+    print lai
+    lai.plot()
+    
     # insert time lag
     if time_lag > 0:
         lai_idx = lai.index + timedelta(days=time_lag)
@@ -65,7 +76,28 @@ def corr(paths, gpi, corr_df, start_date, end_date, time_lag=0, plot_fig=False):
     
     water = {'SWI_001': swi1, 'SWI_010': swi2, 'SWI_020': swi3, 
              'SWI_040': swi4, 'SWI_060': swi5, 'SWI_100': swi6}
+    
     vegetation = {'LAI': lai}#, 'NDVI': ndvi, 'FAPAR': fapar} 
+    
+    # plot lai time lags over SWI
+    if time_lag == 0:
+        lai0 = lai.copy()
+        lai_idx10 = lai.index + timedelta(days=10)
+        lai10 = pd.DataFrame(lai.values, columns=['LAI10'], index=lai_idx10)
+        lai_idx20 = lai.index + timedelta(days=20)
+        lai20 = pd.DataFrame(lai.values, columns=['LAI20'], index=lai_idx20)
+        lai_idx30 = lai.index + timedelta(days=30)
+        lai30 = pd.DataFrame(lai.values, columns=['LAI30'], index=lai_idx30)
+        lai_idx40 = lai.index + timedelta(days=40)
+        lai40 = pd.DataFrame(lai.values, columns=['LAI40'], index=lai_idx40)
+        lai_idx50 = lai.index + timedelta(days=50)
+        lai50 = pd.DataFrame(lai.values, columns=['LAI50'], index=lai_idx50)
+        lai_idx60 = lai.index + timedelta(days=60)
+        lai60 = pd.DataFrame(lai.values, columns=['LAI60'], index=lai_idx60)
+                
+        for w_key in water.keys():
+            plot_alltogether(w_key, gpi, water[w_key], lai0, lai10, lai20, lai30, 
+                             lai40, lai50, lai60)
 
     for ds_veg in vegetation.keys():
         for ds_water in sorted(water.keys()):
@@ -207,14 +239,16 @@ if __name__ == '__main__':
 
     gpi = 1057207
     gpi = 1032891
+    gpi = 1093603
+    gpi = 1075401
     #zribi(paths, gpi, start_date, end_date, plot_fig=False, monthly=True)
     
-    time_lags = [0, 1, 3, 7, 10, 15, 20, 45]
+    time_lags = [0, 10, 20, 30, 40, 50, 60]
     corr_df = pd.DataFrame([], index=time_lags)
     for time_lag in time_lags:
         print time_lag
         corr_df = corr(paths, gpi, corr_df, start_date, end_date, 
-                       time_lag=time_lag, plot_fig=True)
+                       time_lag=time_lag, plot_fig=False)
     
     print corr_df
     plot_cols = []
@@ -223,7 +257,7 @@ if __name__ == '__main__':
             plot_cols.append(col)
     
     plot_df = corr_df[plot_cols]
-    plot_df.plot()
+    plot_df.plot(style='o-')
     plt.title(str(gpi))
     plt.xlabel("Time lag between datasets [days]")
     plt.ylabel("Spearman's Rho")
