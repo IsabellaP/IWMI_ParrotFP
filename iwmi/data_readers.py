@@ -330,6 +330,10 @@ if __name__ == '__main__':
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path, 
              'FAPAR': fapar_path}
     
-    data_reader(datasets, paths)
+    #data_reader(datasets, paths)
+    ndvi_anomaly = read_ts(lai_path, param='LAI', lat=19.5, lon=75.57, 
+                           gpi=None,
+                           start_date=datetime(2010, 7, 1), 
+                           end_date=datetime(2014, 5, 1), plot_ts=True)
     
     print 'done'
