@@ -134,9 +134,9 @@ def read_LC(path, lat_min=5.9180, lat_max=9.8281,
     
     return lccs_masked
 
-def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281, 
-            lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2010,7,1), 
-            plot_img=False):
+def read_img(path, param='NDVI', swi_key='SWI_020', lat_min=5.9180, 
+             lat_max=9.8281, lon_min=79.6960, lon_max=81.8916, 
+             timestamp=datetime(2010,7,1), plot_img=False):
     """
     Parameters:
     -----------
@@ -185,7 +185,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     
     if param == 'SWI':
         # possible variables: SWI_001, 005, 010, 015, 020, 040, 060, 100
-        key = 'SWI_020'
+        key = swi_key
     elif param == 'NDVI300':
         key = 'NDVI'
     else:
