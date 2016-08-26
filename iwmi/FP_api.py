@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from pytesmo.temporal_matching import matching
 from pytesmo.scaling import scale
 import pytesmo.metrics as metrics
-from iwmi.data_analysis import rescale_peng
+from data_analysis import rescale_peng
 
 
 def read_cfg(cfg_file, include_default=True, only_default=False):
@@ -368,8 +368,10 @@ if __name__ == '__main__':
         except TypeError:
             break
     
-    ascat_ssm = rescale_peng(ascat_ssm)
-    FP_df = rescale_peng(FP_df)
+    # bias raus??
+    ascat_ssm = rescale_peng(ascat_ssm, np.nanmin(ascat_ssm), np.nanmax(ascat_ssm))
+    FP_df = rescale_peng(FP_df, np.nanmin(FP_df), np.nanmax(FP_df))
+    
     #rescale_df(ascat_ssm, FP_df)
     #calc_rho(ascat_ssm, FP_df, hoal_df, hoal_raw)
     
