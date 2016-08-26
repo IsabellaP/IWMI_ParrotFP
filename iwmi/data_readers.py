@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pytesmo.scaling as scaling
 import pytesmo.temporal_matching as temp_match
 import pytesmo.metrics as metrics
+from pytesmo.time_series.anomaly import calc_anomaly, calc_climatology
 
 
 # Code for reading various datasets (LAI, NDVI...)
@@ -58,7 +59,7 @@ def read_WARP_dataset(cfg_path):
     """Read WARP soil moisture
     """
     grid_info = {'grid_class': DGGv21CPv20, 
-                 'grid_filename': 'C:\\Users\\i.pfeil\\Documents\\'+
+                 'grid_filename': 'C:\\Users\\s.hochstoger\\Desktop\\'+
                  '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
     grid = init_grid(grid_info)
     WARP_io = WARP(version='IRMA1_WARP56_P2R1', parameter='ssm_userformat', 
@@ -138,8 +139,8 @@ def read_LC(path, lat_min=5.9180, lat_max=9.8281,
     return lccs_masked
 
 def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281, 
-            lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2010,7,1), 
-            plot_img=False):
+            lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2010, 7, 1),
+            plot_img=False, swi='SWI_005'):
     """
     Parameters:
     -----------
@@ -188,7 +189,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     
     if param == 'SWI':
         # possible variables: SWI_001, 005, 010, 015, 020, 040, 060, 100
-        key = 'SWI_020'
+        key = swi
     elif param == 'NDVI300':
         key = 'NDVI'
     else:
@@ -208,7 +209,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
         plt.colorbar()
         plt.title(param+', '+str(nearest_date))
         #plt.show()
-        plt.savefig("C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\"+
+        plt.savefig("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\"+
                      key+"_"+str(timestamp.date())+".png")
         plt.clf()
 
@@ -216,8 +217,8 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
 
 
 def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
-            start_date=datetime(2010,1,1), end_date=datetime(2010,3,31),
-            plot_ts=False, swi_param='SWI_001'):
+            start_date=datetime(2010,1,1), end_date=datetime(2010, 3, 31),
+            plot_ts=False, swi_param='SWI_020'):
     """
     Parameters:
     -----------
@@ -267,7 +268,7 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
     
     # init grid for lonlat/gpi conversion
     grid_info = {'grid_class': DGGv21CPv20, 
-                 'grid_filename': 'C:\\Users\\i.pfeil\\Documents\\'+
+                 'grid_filename': 'C:\\Users\\s.hochstoger\\Desktop\\'+
                  '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
     grid = init_grid(grid_info)
     
@@ -289,14 +290,14 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
         with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
             lons = ncfile.variables['lon'][:]
             lats = ncfile.variables['lat'][:]
-            
+
             # find nearest lonlat
             nearest_lon = find_nearest(lons, lon)
             nearest_lat = find_nearest(lats, lat)
-            lon_idx = np.where(lons==nearest_lon)[0]
-            lat_idx = np.where(lats==nearest_lat)[0]
+            lon_idx = np.where(lons == nearest_lon)[0]
+            lat_idx = np.where(lats == nearest_lat)[0]
             param_data.append(ncfile.variables[key][lat_idx, lon_idx][0][0])
-    
+
     param_data = np.array(param_data)
     df = pd.DataFrame(param_data, index=timestamp_array[date_idx], 
                       columns=[key])
@@ -376,7 +377,8 @@ def corr(paths, gpi, start_date, end_date, plot_fig=False):
             
 
 def find_nearest(array, element):
-    return min(array, key=lambda x: abs(x - element))
+    idx = (np.abs(array-element)).argmin()
+    return array[idx]
 
 
 def zribi(paths, gpi, start_date, end_date, plot_fig=False):
@@ -384,13 +386,13 @@ def zribi(paths, gpi, start_date, end_date, plot_fig=False):
     t_val = 'SWI_060'
     swi_path = paths['SWI']
     ndvi_path = paths['NDVI']
-    
-    swi = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
+
+    swi = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date,
                   end_date=end_date, swi_param=t_val)[t_val]
-    
+
     ndvi = read_ts(ndvi_path, gpi=gpi, param='NDVI', start_date=start_date,
                    end_date=end_date)
-                   
+
     dndvi = np.ediff1d(ndvi, to_end=np.NaN)
     ndvi['D_NDVI'] = pd.Series(dndvi, index=ndvi.index)
     matched_data = temp_match.matching(swi, ndvi)
@@ -449,27 +451,27 @@ def zribi(paths, gpi, start_date, end_date, plot_fig=False):
 
 
 if __name__ == '__main__':
-    
+
     # read Sri Lanka gpis
-    gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_Sri Lanka_warp.csv"
-    gpis_df = pd.read_csv(gpi_path)
-    
+    #gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_Sri Lanka_warp.csv"
+    #gpis_df = pd.read_csv(gpi_path)
+
     # set paths to datasets
-    ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
-    lcpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
-    ndvi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI\\"
-    ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
-    lai_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\"
-    swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
-    fapar_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
+    ssm_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
+    lcpath = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
+    ndvi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI\\"
+    ndvi300_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
+    lai_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\LAI\\"
+    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\"
+    fapar_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
     
     datasets = ['NDVI']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path, 
              'FAPAR': fapar_path}
-    
+
     #data_reader(datasets, paths)
-    
+
     start_date = datetime(2007, 7, 1)
     end_date = datetime(2009, 7, 1)
     #for gpi in gpis_df['point']:
