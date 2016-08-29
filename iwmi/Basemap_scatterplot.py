@@ -17,7 +17,7 @@ def scatterplot(lons, lats, data, s=1, title=None):
     m.drawmeridians(meridians,labels=[0,0,0,1])
     
     sc = m.scatter(lons, lats, c=data, edgecolor='None',
-                   marker='s', s=s)
+                   marker='o', s=s)
     m.colorbar(sc, 'right', size='5%', pad='2%')
     if title:
         plt.title(title)
