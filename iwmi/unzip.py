@@ -31,7 +31,7 @@ def format_to_folder(root, formatstr, out_path):
                                 os.path.join(out_path, name))
                 
 
-def merge_nc(path, new_path):
+def merge_nc(path, new_path, variables, datestr):
     
     new_ncf = 'new_nc.nc'
     
@@ -39,16 +39,6 @@ def merge_nc(path, new_path):
     with Dataset(os.path.join(path, os.listdir(path)[0]), 'r') as ncfile:
         lons = ncfile.variables['lon'][:]
         lats = ncfile.variables['lat'][:]
-        
-    swi1_tmp = []
-    swi2_tmp = []
-    swi3_tmp = []
-    swi4_tmp = []
-    swi5_tmp = []
-    swi6_tmp = []
-    swi7_tmp = []
-    swi8_tmp = []
-    date = []
     
     with Dataset(os.path.join(new_path, new_ncf), 'w') as ncfile:
         
@@ -93,84 +83,29 @@ def merge_nc(path, new_path):
         setattr(lon, 'valid_range', [-180.0, 180.0])
 
         # variables
-        swi1 = ncfile.createVariable('SWI_001', np.dtype('f4').char,
-                                    ('time', 'lat', 'lon',),
-                                    fill_value=255, zlib=True,
-                                    complevel=4)
-        
-        swi2 = ncfile.createVariable('SWI_005', np.dtype('f4').char,
-                                    ('time', 'lat', 'lon',),
-                                    fill_value=255, zlib=True,
-                                    complevel=4)
-        
-        swi3 = ncfile.createVariable('SWI_010', np.dtype('f4').char,
-                                    ('time', 'lat', 'lon',),
-                                    fill_value=255, zlib=True,
-                                    complevel=4)
-                    
-        swi4 = ncfile.createVariable('SWI_015', np.dtype('f4').char,
-                                    ('time', 'lat', 'lon',),
-                                    fill_value=255, zlib=True,
-                                    complevel=4)
-        
-        swi5 = ncfile.createVariable('SWI_020', np.dtype('f4').char,
-                                    ('time', 'lat', 'lon',),
-                                    fill_value=255, zlib=True,
-                                    complevel=4)
-        
-        swi6 = ncfile.createVariable('SWI_040', np.dtype('f4').char,
-                                    ('time', 'lat', 'lon',),
-                                    fill_value=255, zlib=True,
-                                    complevel=4)
-        
-        swi7 = ncfile.createVariable('SWI_060', np.dtype('f4').char,
-                                    ('time', 'lat', 'lon',),
-                                    fill_value=255, zlib=True,
-                                    complevel=4)
-        
-        swi8 = ncfile.createVariable('SWI_100', np.dtype('f4').char,
-                                    ('time', 'lat', 'lon',),
-                                    fill_value=255, zlib=True,
-                                    complevel=4)
+        data = {}
+        for var in variables:
+            data[var] = ncfile.createVariable(var, np.dtype('f4').char,
+                                              ('time', 'lat', 'lon',),
+                                              fill_value=255, zlib=True,
+                                              complevel=4)
 
-        for ncf in sorted(os.listdir(path)):  
+        for idx, ncf in enumerate(sorted(os.listdir(path))):
+            print idx
             with Dataset(os.path.join(path, ncf), 'r') as ncfile_single:
-                swi1_single = ncfile_single.variables['SWI_001'][:]
-                swi2_single = ncfile_single.variables['SWI_005'][:]
-                swi3_single = ncfile_single.variables['SWI_010'][:]
-                swi4_single = ncfile_single.variables['SWI_015'][:]
-                swi5_single = ncfile_single.variables['SWI_020'][:]
-                swi6_single = ncfile_single.variables['SWI_040'][:]
-                swi7_single = ncfile_single.variables['SWI_060'][:]
-                swi8_single = ncfile_single.variables['SWI_100'][:]
-                
-            swi1_tmp.append(swi1_single)
-            swi2_tmp.append(swi2_single)
-            swi3_tmp.append(swi3_single)
-            swi4_tmp.append(swi4_single)
-            swi5_tmp.append(swi5_single)
-            swi6_tmp.append(swi6_single)
-            swi7_tmp.append(swi7_single)
-            swi8_tmp.append(swi8_single)
-            
-            year = int(ncf[16:20])
-            month = int(ncf[20:22])
-            day = int(ncf[22:24])
-            date.append(datetime(year, month, day))
-                
-        timestamp = date
-        numdate = date2num(timestamp, units=times.units,
-                       calendar=times.calendar)
-        times[:] = numdate
+                data_single = {}
+                for var in variables:
+                    data_single[var] = ncfile_single.variables[var][:]
+                    data[var][idx,:,] = data_single[var]
+
+            year = int(ncf[datestr['year'][0]:datestr['year'][1]])
+            month = int(ncf[datestr['month'][0]:datestr['month'][1]])
+            day = int(ncf[datestr['day'][0]:datestr['day'][1]])
+            numdate = date2num(datetime(year,month,day), units=times.units,
+                               calendar=times.calendar)
+            times[idx] = numdate     
         
-        swi1[:] = swi1_tmp
-        swi2[:] = swi2_tmp
-        swi3[:] = swi3_tmp
-        swi4[:] = swi4_tmp
-        swi5[:] = swi5_tmp
-        swi6[:] = swi6_tmp
-        swi7[:] = swi7_tmp
-        swi8[:] = swi8_tmp
+    print 'Finished.'
 
 if __name__ == '__main__':
     
@@ -181,8 +116,10 @@ if __name__ == '__main__':
     
     root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI'
     formatstr = '.nc'
-    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\SWI'
+    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\tiffs\\NDVI\\'
     #format_to_folder(root, formatstr, out_path)
     new_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\'
-    merge_nc(out_path, new_path)
+    #datestr = {'year': (16,20), 'month': (20,22), 'day': (22,24)}
+    datestr = {'year': (15,19), 'month': (19,21), 'day': (21,23)}
+    merge_nc(out_path, new_path, ['NDVI'], datestr)
     
