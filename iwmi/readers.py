@@ -159,14 +159,14 @@ def read_img(path, param='SWI_020', lat_min=5.9180, lat_max=9.8281,
     return data
 
 
-def read_ts(path, param='SWI_020', lon=80.5, lat=6.81,
+def read_ts(path, params=['SWI_020'], lon=80.5, lat=6.81,
             start_date=datetime(2010, 1, 1), end_date=datetime(2010, 3, 31)):
     """
     Parameters:
     -----------
     path : str
         Path to nc-data
-    param : str
+    params : list of str
         Parameter to be read (name as in nc-files). Default: SWI_020
     lon, lat : float
         Longitude and latitude of point of interest, default: point in Sri
@@ -179,7 +179,10 @@ def read_ts(path, param='SWI_020', lon=80.5, lat=6.81,
     data : pd.DataFrame
         Dataset
     """
-    key = param
+
+    if isinstance(params, basestring):
+        params = [params]
+
     with Dataset(path, "r") as ncfile:
         unit_temps = ncfile.variables['time'].units
         nctime = ncfile.variables['time'][:]
@@ -199,14 +202,18 @@ def read_ts(path, param='SWI_020', lon=80.5, lat=6.81,
         nearest_lat = find_nearest(lats, lat)
         lon_idx = np.where(lons == nearest_lon)[0]
         lat_idx = np.where(lats == nearest_lat)[0]
+        
+        df = pd.DataFrame([], index=all_dates[date_idx],
+                          columns=params)
 
-        data = ncfile.variables[key][date_idx, lat_idx, lon_idx]
-
-    param_data = np.array(data)
-    df = pd.DataFrame(param_data.flatten(), index=all_dates[date_idx],
-                      columns=[key])
-
+        for key in params:
+            data = ncfile.variables[key][date_idx, lat_idx, lon_idx]
+            param_data = np.array(data)
+            
+            df[key] = param_data.flatten()
+            
     return df
+
 
 def find_nearest(array, element):
     idx = (np.abs(array - element)).argmin()
