@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
 from netCDF4 import Dataset
 
 from data_readers import read_ts, read_img, read_poets_nc, init_SWI_grid, init_poets_grid
@@ -234,8 +235,32 @@ def plot_corr(corr_df, lon, lat):
 
 def plot_rho(max_rho, lons, lats):
        
+    #===========================================================================
+    # for SWI_key in max_rho:
+    #     scatterplot(lons, lats, max_rho[SWI_key], s=75, title=SWI_key)
+    #===========================================================================
+    
     for SWI_key in max_rho:
-        scatterplot(lons, lats, max_rho[SWI_key], s=75, title=SWI_key)
+        fig = plt.figure()
+        ax = fig.add_axes([0.1,0.1,0.8,0.8])
+        m = Basemap(projection='cyl', ax=ax)
+        m.drawcoastlines()
+        m.drawcountries()
+        
+        parallels = np.arange(-90,90,15.)
+        m.drawparallels(parallels,labels=[1,0,0,0])
+        meridians = np.arange(-180,180,15.)
+        m.drawmeridians(meridians,labels=[0,0,0,1])
+        
+        #sc = m.scatter(lons, lats, c=max_rho[SWI_key], edgecolor='None', s=10)
+        sc = m.scatter(lons, lats, c=max_rho[SWI_key], edgecolor='None', s=75, marker=',')
+        m.colorbar(sc, 'right', size='5%', pad='2%')
+        plt.title('Time lag leading to highest correlation between VI and '+
+                  SWI_key)
+        plt.show()
+    
+    print 'done'
+
 
 def zribi(paths, gpi, start_date, end_date, t_val='SWI_020', vi_str='NDVI', 
           plot_fig=False, monthly=False):
@@ -443,7 +468,7 @@ if __name__ == '__main__':
     time_lags = [0, 10, 20, 30, 40, 50, 60, 100]
     corr_df = pd.DataFrame([], index=time_lags)
     
-    for i in range(len(gpis[:50])):
+    for i in range(len(gpis)):
         print i
         for time_lag in time_lags:
             #print time_lag
@@ -454,9 +479,13 @@ if __name__ == '__main__':
             #print corr_df
                 
             #plot_corr(corr_df, gpi)
-        max_rho = max_corr(corr_df, max_rho)
+        #max_rho = max_corr(corr_df, max_rho)
      
     # plot maps showing time lag with highest rho
+    max_rho_data = np.array([0, 100, 100, 100, 0, 10, 0, 20, 0, 10, 20, 30, 0, 0, 40, 20, 20, 
+                             10, 10, 20, 0, np.NaN, 0, 0, 0, 0, 0, 0, 0, 10, 10, 0, 0, 0, 0, 
+                             100, 100, 20, np.NaN, 0, 0, 10, 50, 50, 30, 0, 10, 30, 0, 30])
+    max_rho = {'key': max_rho_data}
     plot_rho(max_rho, lons[:50], lats[:50])
     
     print 'done'

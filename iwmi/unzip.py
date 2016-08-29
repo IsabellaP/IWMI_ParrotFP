@@ -114,12 +114,15 @@ if __name__ == '__main__':
     
     #unzip(path_in, path_out)
     
-    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI'
+    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\'
     formatstr = '.nc'
-    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\tiffs\\NDVI\\'
+    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\FAPAR\\'
     #format_to_folder(root, formatstr, out_path)
+    
     new_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\'
-    #datestr = {'year': (16,20), 'month': (20,22), 'day': (22,24)}
-    datestr = {'year': (15,19), 'month': (19,21), 'day': (21,23)}
-    merge_nc(out_path, new_path, ['NDVI'], datestr)
+    #datestr = {'year': (16,20), 'month': (20,22), 'day': (22,24)} # SWI
+    #datestr = {'year': (15,19), 'month': (19,21), 'day': (21,23)} # NDVI
+    datestr = {'year': (16,20), 'month': (20,22), 'day': (22,24)} # FAPAR
+    #datestr = {'year': (14,18), 'month': (18,20), 'day': (20,22)} # LAI
+    merge_nc(out_path, new_path, ['FAPAR'], datestr)
     
