@@ -110,12 +110,14 @@ def read_LC(path, lat_min=5.9180, lat_max=9.8281,
     mask_out = ((no_data) | (urban) | (water) | (snow_and_ice))
     lccs_masked = np.ma.masked_where(mask_out, lccs)
 
-    plt.imshow(lccs_masked)
-    plt.colorbar()
-    plt.title('ESA CCI land cover')
-    plt.show()
+    #===========================================================================
+    # plt.imshow(lccs_masked)
+    # plt.colorbar()
+    # plt.title('ESA CCI land cover')
+    # plt.show()
+    #===========================================================================
 
-    return lccs_masked
+    return lccs_masked, lon[lon_idx], lat[lat_idx]
 
 
 def read_img(path, param='SWI_020', lat_min=5.9180, lat_max=9.8281,
@@ -156,7 +158,7 @@ def read_img(path, param='SWI_020', lat_min=5.9180, lat_max=9.8281,
         lon_idx = np.where((lons >= lon_min) & (lons <= lon_max))[0]
         data = ncfile.variables[key][date_idx, lat_idx, lon_idx]
 
-    return data
+    return data, lons[lon_idx], lats[lat_idx]
 
 
 def read_ts(path, params=['SWI_020'], lon=80.5, lat=6.81,

@@ -387,7 +387,7 @@ def init_SWI_grid(fpath=None):
 def init_poets_grid(fpath=None):
     
     if fpath is None:
-        fpath = "C:\\Users\\i.pfeil\\Desktop\\poets\\DATA\\"
+        fpath = "C:\\Users\\i.pfeil\\Desktop\\poets\\DATA\\alt\\"
     fname = "West_SA_0.4_dekad.nc"
     with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
         lon = ncfile.variables['lon'][:]
