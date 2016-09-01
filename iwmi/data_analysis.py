@@ -16,8 +16,8 @@ import pytesmo.metrics as metrics
 from pytesmo.grid.resample import resample_to_grid
 
 
-def plot_alltogether(time_lag, gpi, ts1, ts2, scale_ts=False, save_fig=False,
-                     *args):
+def plot_alltogether(time_lag, lon, lat, ts1, ts2, scale_ts=False, 
+                     save_fig=False, *args):
 
     matched_data = temp_match.matching(ts1, ts2, *args)
     if len(matched_data) == 0:
@@ -29,8 +29,9 @@ def plot_alltogether(time_lag, gpi, ts1, ts2, scale_ts=False, save_fig=False,
     matched_data.plot(figsize=(15, 5))
     plt.title('SWI and Vegetation indices comparison (rescaled)')
     if save_fig:
-        plt.savefig("C:\\Users\\i.pfeil\\Desktop\\TS_plots\\"+str(gpi)+"_"+
-                str(time_lag)+".png")
+        plt.savefig("C:\\Users\\i.pfeil\\Desktop\\TS_plots\\lon_"+str(lon)+
+                    "_lat_"+str(lat)+'_'+str(time_lag)+".png", 
+                    bbox_inches='tight')
         plt.clf()
     else:
         plt.show()
@@ -80,6 +81,7 @@ def corr(paths, corr_df, start_date, end_date, lon=None, lat=None,
                      start_date=start_date, end_date=end_date)
     vi = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
                  start_date=start_date, end_date=end_date)
+    vi[vi_str][np.where(vi==255)[0]] = np.NaN
 
     water = {}
     for swi_key in swi_list:
@@ -113,6 +115,17 @@ def corr(paths, corr_df, start_date, end_date, lon=None, lat=None,
         vi50 = pd.DataFrame(vi.values, columns=['vi50'], index=vi_idx50)
         vi_idx60 = vi.index + timedelta(days=60)
         vi60 = pd.DataFrame(vi.values, columns=['vi60'], index=vi_idx60)
+        vi_idx100 = vi.index + timedelta(days=100)
+        vi100 = pd.DataFrame(vi.values, columns=['vi100'], index=vi_idx100)
+        
+    plot_alltogether(0, lon, lat, swi_df, vi0, save_fig=True)
+    plot_alltogether(10, lon, lat, swi_df, vi10, save_fig=True)
+    plot_alltogether(20, lon, lat, swi_df, vi20, save_fig=True)
+    plot_alltogether(30, lon, lat, swi_df, vi30, save_fig=True)
+    plot_alltogether(40, lon, lat, swi_df, vi40, save_fig=True)
+    plot_alltogether(50, lon, lat, swi_df, vi50, save_fig=True)
+    plot_alltogether(60, lon, lat, swi_df, vi60, save_fig=True)
+    plot_alltogether(100, lon, lat, swi_df, vi100, save_fig=True)
 
     vegetation = {vi_str: vi}
 
@@ -201,7 +214,7 @@ def plot_rho(max_rho, lons, lats):
     print 'done'
 
 
-def zribi(paths, gpi, start_date, end_date, t_val='SWI_020', vi_str='NDVI', 
+def zribi(paths, lon, lat, start_date, end_date, t_val='SWI_020', vi_str='NDVI', 
           plot_fig=False, monthly=False):
     
     """ Simulate VI from SWI as in Zribi et al., 2010.
@@ -233,12 +246,14 @@ def zribi(paths, gpi, start_date, end_date, t_val='SWI_020', vi_str='NDVI',
     swi_path = paths['SWI']
     vi_path = paths[vi_str]
     
-    # read SWI with given t value and VI
-    swi = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-                  end_date=end_date, swi_param=t_val)#[t_val]
+    swi_list = ['SWI_001', 'SWI_010', 'SWI_020', 'SWI_040', 'SWI_060', 'SWI_100']
+    swi_df = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
+                     start_date=start_date, end_date=end_date)
+    vi = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
+                 start_date=start_date, end_date=end_date)
+    vi[vi_str][np.where(vi==255)[0]] = np.NaN
     
-    vi = read_ts(vi_path, gpi=gpi, param=vi_str, start_date=start_date,
-                end_date=end_date)
+    swi = swi_df[t_val]
     
     # resample monthly
     if monthly:
@@ -313,14 +328,23 @@ def zribi(paths, gpi, start_date, end_date, t_val='SWI_020', vi_str='NDVI',
         vi_sim.append(vi_sim1)
     
     # plot results
-    results = pd.DataFrame(matched_data[t_val].values, columns=[t_val],
-                           index=matched_data.index)
-    results[vi_str] = pd.Series(matched_data[vi_str].values*100, 
-                                index=matched_data.index)
-    results[vi_str+'_sim'] = pd.Series(np.multiply(vi_sim, 100), 
+    if monthly:
+        results = pd.DataFrame(vi[vi_str].values*100, columns=[vi_str], index=vi.index)
+        results[t_val] = pd.Series(swi.values, index=swi.index)
+        results[vi_str+'_sim'] = pd.Series(np.multiply(vi_sim, 100), 
+                                        index=matched_data.index)
+        
+    else:
+        results = pd.DataFrame(matched_data[t_val].values, columns=[t_val],
+                               index=matched_data.index)
+        results[vi_str] = pd.Series(matched_data[vi_str].values*100, 
                                     index=matched_data.index)
+        results[vi_str+'_sim'] = pd.Series(np.multiply(vi_sim, 100), 
+                                           index=matched_data.index)
+        
+    print results
     results.plot()
-    plt.title(str(gpi)+', t value: '+t_val)
+    plt.title('Lon: '+str(lon)+', lat: '+str(lat)+', t value: '+t_val)
     plt.show()
       
     return vi_sim
@@ -379,7 +403,7 @@ def resample_rho_LC(input_data, src_lons, src_lats, target_lons, target_lats,
 
     return data_resamp['data']
 
-def LC_mask(search_rad=80000):
+def LC_mask(lons, lats, search_rad=80000):
     # read landcover classes
     lccs, lccs_lons, lccs_lats = read_img('C:\\Users\\i.pfeil\\Desktop\\'+
                                           'poets\\DATA\\West_SA_0.4_monthly_LC.nc',
@@ -425,61 +449,66 @@ if __name__ == '__main__':
              'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path, 
              'FAPAR': fapar_path}
     
-    #zribi(paths, gpi, start_date, end_date, t_val='SWI_020', vi_str='NDVI',
-    #      plot_fig=False, monthly=True)
+    lon = 73.8
+    lat = 21
+    start_date = datetime(2007,7,1)
+    end_date = datetime(2015,7,1)
+    zribi(paths, lon, lat, start_date, end_date, t_val='SWI_020', vi_str='NDVI',
+          plot_fig=False, monthly=False)
     
-    #===========================================================================
-    # grid = init_SWI_grid()
-    # lons = grid.activearrlon
-    # lats = grid.activearrlat
-    # 
-    # # shpfile-bbox
-    # lonlat_idx = np.where((lats>=14.7) & (lats<=29.4) & (lons>=68.0) & 
-    #                       (lons<=81.8))[0]
-    # lons_shp = lons[lonlat_idx]
-    # lats_shp = lats[lonlat_idx]
-    #===========================================================================
-    
-    # poets lonlat
-    #grid = init_SWI_grid()
-    grid = init_poets_grid()
-    gpis, lons, lats = grid.get_grid_points()
-    print gpis.shape
-    
- #==============================================================================
- #    start_date = datetime(2007, 7, 1)
- #    end_date = datetime(2016, 7, 1)
- #    max_rho = {}
- #    time_lags = [0, 10, 20, 30, 40, 50, 60, 100]
- #    corr_df = pd.DataFrame([], index=time_lags)
- #     
- #    for i in range(len(gpis)):
- #        print i
- #        for time_lag in time_lags:
- #            #print time_lag
- #            corr_df = corr(paths, corr_df, start_date, end_date, lon=lons[i], 
- #                           lat=lats[i], vi_str='NDVI', time_lag=time_lag)
- #                            
- #        max_rho = max_corr(corr_df, max_rho)
- # 
- #    np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_rho_2007_2016.npy', 
- #            max_rho)
- #==============================================================================
-     
-    # Load
-    max_rho = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_rho.npy').item()
- 
-    # read LC 300m
-    #lc = read_LC(lcpath, 14.7, 29.4, 68, 81.8)
- 
-    lccs_masked = LC_mask()
-    scatterplot(lons, lats,lccs_masked, s=75, title='ESA CCI land cover classes, 0.4 deg.')
-     
-    max_rho_masked = {}
-    for key in max_rho:
-        max_rho_masked[key] = np.ma.array(max_rho[key], mask=lccs_masked.mask)
-      
-    # plot maps showing time lag with highest rho
-    plot_rho(max_rho_masked, lons, lats)
+  #=============================================================================
+  #   grid = init_SWI_grid()
+  #   lons = grid.activearrlon
+  #   lats = grid.activearrlat
+  #    
+  #   # shpfile-bbox
+  #   lonlat_idx = np.where((lats>=14.7) & (lats<=29.4) & (lons>=68.0) & 
+  #                         (lons<=81.8))[0]
+  #   lons_shp = lons[lonlat_idx]
+  #   lats_shp = lats[lonlat_idx]
+  #   
+  #   # poets lonlat
+  #   #grid = init_SWI_grid()
+  #   grid = init_poets_grid()
+  #   gpis, lons, lats = grid.get_grid_points()
+  #   print gpis.shape
+  #   
+  #   start_date = datetime(2007, 7, 1)
+  #   end_date = datetime(2015, 7, 1)
+  #   max_rho = {}
+  #   time_lags = [0]#, 10, 20, 30, 40, 50, 60, 100]
+  #   corr_df = pd.DataFrame([], index=time_lags)
+  #     
+  #   #for i in range(len(gpis)):
+  #   lon = 73.8
+  #   lat = 21
+  #   #print i
+  #   for time_lag in time_lags:
+  #       #print time_lag
+  #       corr_df = corr(paths, corr_df, start_date, end_date, lon=lon, 
+  #                      lat=lat, vi_str='NDVI', time_lag=time_lag, 
+  #                      plot_time_lags=True)
+  #                            
+  #       #max_rho = max_corr(corr_df, max_rho)
+  # 
+  #   np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_rho_2007_2016.npy', 
+  #           max_rho)
+  #     
+  #   # Load
+  #   max_rho = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_rho.npy').item()
+  # 
+  #   # read LC 300m
+  #   #lc = read_LC(lcpath, 14.7, 29.4, 68, 81.8)
+  # 
+  #   lccs_masked = LC_mask()
+  #   scatterplot(lons, lats,lccs_masked, s=75, title='ESA CCI land cover classes, 0.4 deg.')
+  #     
+  #   max_rho_masked = {}
+  #   for key in max_rho:
+  #       max_rho_masked[key] = np.ma.array(max_rho[key], mask=lccs_masked.mask)
+  #      
+  #   # plot maps showing time lag with highest rho
+  #   plot_rho(max_rho_masked, lons, lats)
+  #=============================================================================
      
     print 'done'
