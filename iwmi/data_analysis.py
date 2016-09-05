@@ -3,15 +3,16 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+from netCDF4 import Dataset
 
-from data_readers import read_ts, read_img
+from readers import read_ts, read_img
+from data_readers import read_poets_nc, init_SWI_grid, init_poets_grid
 from Basemap_scatterplot import scatterplot
 
 import pytesmo.scaling as scaling
 import pytesmo.temporal_matching as temp_match
 import pytesmo.metrics as metrics
-from pygrids.warp5 import DGGv21CPv20
-from warp_data.interface import init_grid
 
 
 def plot_alltogether(time_lag, gpi, ts1, ts2, scale_ts=False, save_fig=False,
@@ -40,8 +41,8 @@ def rescale_peng(vi, vi_min, vi_max):
     return vi_resc
 
 
-def corr(paths, gpi, corr_df, start_date, end_date, vi_str='NDVI', time_lag=0, 
-         plot_ts=False, plot_time_lags=False, read_gpi_wise=False):
+def corr(paths, corr_df, start_date, end_date, lon=None, lat=None, 
+         vi_str='NDVI', time_lag=0, plot_time_lags=False):
 
     """ Calculate Spearman's Rho and p-value for SWI (all t-values) and 
     specified VI (default NDVI).
@@ -52,8 +53,6 @@ def corr(paths, gpi, corr_df, start_date, end_date, vi_str='NDVI', time_lag=0,
     -----------
     paths : dict
         Paths to datasets
-    gpi : int
-        grid point (WARP grid, see http://rs.geo.tuwien.ac.at/dv/dgg/)
     corr_df : pd.DataFrame
         DataFrame where correlation coeff.s are stored
     start_date, end_date : datetime
@@ -62,8 +61,6 @@ def corr(paths, gpi, corr_df, start_date, end_date, vi_str='NDVI', time_lag=0,
         Vegetation index to use, default: NDVI
     time_lag : int, optional
         time lag for shifting VI, default: 0 (days)
-    plot_ts : bool, optional
-        Plot time series of all datasets, default: False
     plot_time_lags : bool, optional
         Plot (shifted) VI over SWIs, default: False
         
@@ -72,54 +69,36 @@ def corr(paths, gpi, corr_df, start_date, end_date, vi_str='NDVI', time_lag=0,
     corr_df : pd.DataFrame
         DataFrame containing the correlation coeff.s
     """
-    
+
     swi_path = paths['SWI']
     vi_path = paths[vi_str]
     
     # read SWI for different T-values and VI
-    if read_gpi_wise:
-        swi1 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-                       end_date=end_date, swi_param='SWI_001')
-        swi2 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-                       end_date=end_date, swi_param='SWI_010')
-        swi3 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-                       end_date=end_date, swi_param='SWI_020')
-        swi4 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-                       end_date=end_date, swi_param='SWI_040')
-        swi5 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-                       end_date=end_date, swi_param='SWI_060')
-        swi6 = read_ts(swi_path, gpi=gpi, param='SWI', start_date=start_date, 
-                       end_date=end_date, swi_param='SWI_100')
-        
-        vi = read_ts(vi_path, gpi=gpi, param=vi_str, start_date=start_date,
-                    end_date=end_date)
+    swi_list = ['SWI_001', 'SWI_010', 'SWI_020', 'SWI_040', 'SWI_060', 'SWI_100']
+    swi_df = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
+                     start_date=start_date, end_date=end_date)
+    vi = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
+                 start_date=start_date, end_date=end_date)
+
+    water = {}
+    for swi_key in swi_list:
+        water[swi_key] = swi_df[swi_key]
     
-    else: # average gpis
-        swi1 = avg_gpis('SWI', swi_path, start_date, end_date, swi_key='SWI_001')
-        swi2 = avg_gpis('SWI', swi_path, start_date, end_date, swi_key='SWI_010')
-        swi3 = avg_gpis('SWI', swi_path, start_date, end_date, swi_key='SWI_020')
-        swi4 = avg_gpis('SWI', swi_path, start_date, end_date, swi_key='SWI_040')
-        swi5 = avg_gpis('SWI', swi_path, start_date, end_date, swi_key='SWI_060')
-        swi6 = avg_gpis('SWI', swi_path, start_date, end_date, swi_key='SWI_100')
-        vi = avg_gpis(vi_str, vi_path, start_date, end_date)
+    vegetation = {vi_str: vi} 
     
     # rescale VI before further processing using method from Peng et al., 2014
-    vi = rescale_peng(vi, vi.min(), vi.max())
+    for ds_water in water:
+        water[ds_water] = rescale_peng(water[ds_water], 
+                                       np.nanmin(water[ds_water]), 
+                                       np.nanmax(water[ds_water]))
+    
+    vi = rescale_peng(vi, np.nanmin(vi), np.nanmax(vi))
     
     # insert time lag
     if time_lag > 0:
         vi_idx = vi.index + timedelta(days=time_lag)
         vi = pd.DataFrame(vi.values, columns=[vi_str], index=vi_idx)
 
-    # plot datasets
-    if plot_ts:
-        print gpi
-        plot_alltogether(time_lag, gpi, swi1, swi2, swi3, swi4, swi5, swi6, vi)
-    
-    water = {'SWI_001': swi1, 'SWI_010': swi2, 'SWI_020': swi3, 
-             'SWI_040': swi4, 'SWI_060': swi5, 'SWI_100': swi6} 
-    vegetation = {vi_str: vi} 
-    
     # plot vi time lags over SWI
     if plot_time_lags and time_lag == 0:
         vi0 = vi.copy()
@@ -135,10 +114,6 @@ def corr(paths, gpi, corr_df, start_date, end_date, vi_str='NDVI', time_lag=0,
         vi50 = pd.DataFrame(vi.values, columns=['vi50'], index=vi_idx50)
         vi_idx60 = vi.index + timedelta(days=60)
         vi60 = pd.DataFrame(vi.values, columns=['vi60'], index=vi_idx60)
-                
-        for w_key in water.keys():
-            plot_alltogether(w_key, gpi, water[w_key], vi0, vi10, vi20, vi30, 
-                             vi40, vi50, vi60)
 
     # calculate Spearman's Rho and p-value for VI and SWIs
     for ds_veg in vegetation.keys():
@@ -148,8 +123,8 @@ def corr(paths, gpi, corr_df, start_date, end_date, vi_str='NDVI', time_lag=0,
             rho, p = metrics.spearmanr(data_together[ds_water], 
                                        data_together[ds_veg])
             # mask values with p-value > 0.05
-            if p > 0.05:
-                rho = np.NaN
+            #if p > 0.05:
+            #    rho = np.NaN
             if ds_veg+'_'+ds_water+'_rho' in corr_df.columns:
                 corr_df[ds_veg+'_'+ds_water+'_rho'].iloc[np.where(corr_df.index==
                                                               time_lag)] = rho
@@ -177,7 +152,7 @@ def max_corr(corr_df, max_rho):
     return max_rho
 
 
-def plot_corr(corr_df, gpi):
+def plot_corr(corr_df, lon, lat):
     
     """ Plot correlation values.
     
@@ -194,22 +169,39 @@ def plot_corr(corr_df, gpi):
     
     plot_df = corr_df[plot_cols]
     plot_df.plot(style='o-')
-    plt.title(str(gpi))
+    plt.title('Lon: '+str(lon)+', lat: '+str(lat))
     plt.xlabel("Time lag between datasets [days]")
     plt.ylabel("Spearman's Rho")
     plt.show()
 
 
-def plot_rho(gpis, max_rho):
-    
-    grid_info = {'grid_class': DGGv21CPv20, 
-                 'grid_filename': 'C:\\Users\\i.pfeil\\Documents\\'+
-                 '0_IWMI_DATASETS\\ssm\\DGGv02.1_CPv02.nc'}
-    grid = init_grid(grid_info)
-    lons, lats = grid.gpi2lonlat(gpis)
+def plot_rho(max_rho, lons, lats):
+       
+    #===========================================================================
+    # for SWI_key in max_rho:
+    #     scatterplot(lons, lats, max_rho[SWI_key], s=75, title=SWI_key)
+    #===========================================================================
     
     for SWI_key in max_rho:
-        scatterplot(lons, lats, max_rho[SWI_key], s=15, title=SWI_key)
+        fig = plt.figure()
+        ax = fig.add_axes([0.1,0.1,0.8,0.8])
+        m = Basemap(projection='cyl', ax=ax)
+        m.drawcoastlines()
+        m.drawcountries()
+        
+        parallels = np.arange(-90,90,15.)
+        m.drawparallels(parallels,labels=[1,0,0,0])
+        meridians = np.arange(-180,180,15.)
+        m.drawmeridians(meridians,labels=[0,0,0,1])
+        
+        #sc = m.scatter(lons, lats, c=max_rho[SWI_key], edgecolor='None', s=10)
+        sc = m.scatter(lons, lats, c=max_rho[SWI_key], edgecolor='None', s=75, marker=',')
+        m.colorbar(sc, 'right', size='5%', pad='2%')
+        plt.title('Time lag leading to highest correlation between VI and '+
+                  SWI_key)
+        plt.show()
+    
+    print 'done'
 
 
 def zribi(paths, gpi, start_date, end_date, t_val='SWI_020', vi_str='NDVI', 
@@ -375,18 +367,18 @@ def avg_gpis(param, path, start_date=datetime(2008,1,1),
 if __name__ == '__main__':
     
     # read Sri Lanka gpis
-    gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_India_warp.csv"
-    gpis_df = pd.read_csv(gpi_path)
-    ind = np.where(gpis_df['cell']==1821)[0]
-    gpis1821 = gpis_df['point'].values[ind]
+    #gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_India_warp.csv"
+    #gpis_df = pd.read_csv(gpi_path)
+    #ind = np.where(gpis_df['cell']==1821)[0]
+    #gpis1821 = gpis_df['point'].values[ind]
     
     # set paths to datasets
     ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
     lcpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
-    ndvi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI\\"
+    ndvi_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\NDVI_stack.nc"
     ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
     lai_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\"
-    swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
+    swi_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\SWI_stack.nc"
     fapar_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
     
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
@@ -395,26 +387,47 @@ if __name__ == '__main__':
     
     #zribi(paths, gpi, start_date, end_date, t_val='SWI_020', vi_str='NDVI',
     #      plot_fig=False, monthly=True)
-     
+    
+    #===========================================================================
+    # grid = init_SWI_grid()
+    # lons = grid.activearrlon
+    # lats = grid.activearrlat
+    # 
+    # # shpfile-bbox
+    # lonlat_idx = np.where((lats>=14.7) & (lats<=29.4) & (lons>=68.0) & 
+    #                       (lons<=81.8))[0]
+    # lons_shp = lons[lonlat_idx]
+    # lats_shp = lats[lonlat_idx]
+    #===========================================================================
+    
+    # poets lonlat
+    grid = init_poets_grid()
+    gpis, lons, lats = grid.get_grid_points()
+    
     start_date = datetime(2007, 12, 20)
     end_date = datetime(2009, 1, 1)
     max_rho = {}
-    for gp in sorted(gpis1821[1:10]):
-        print gp
-        time_lags = [0, 20, 40, 60]
-        corr_df = pd.DataFrame([], index=time_lags)
+    time_lags = [0, 10, 20, 30, 40, 50, 60, 100]
+    corr_df = pd.DataFrame([], index=time_lags)
+    
+    for i in range(len(gpis)):
+        print i
         for time_lag in time_lags:
-            print time_lag
-            corr_df = corr(paths, gp, corr_df, start_date, end_date, 
-                           vi_str='NDVI', time_lag=time_lag, plot_ts=False,
-                           read_gpi_wise=True)
+            #print time_lag
+            corr_df = corr(paths, corr_df, start_date, end_date, lon=lons[i], 
+                           lat=lats[i], vi_str='NDVI', time_lag=time_lag)
                            
-            print corr_df
-            
-        #plot_corr(corr_df, gpi)
+        #corr_df.to_csv("C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_"+
+        #               str(lons[i])+'_'+str(lats[i])+'.csv')
+                
+            #plot_corr(corr_df, gpi)
         max_rho = max_corr(corr_df, max_rho)
      
     # plot maps showing time lag with highest rho
-    plot_rho(sorted(gpis1821[1:10]), max_rho)
+    max_rho_data = np.array([0, 100, 100, 100, 0, 10, 0, 20, 0, 10, 20, 30, 0, 0, 40, 20, 20, 
+                             10, 10, 20, 0, np.NaN, 0, 0, 0, 0, 0, 0, 0, 10, 10, 0, 0, 0, 0, 
+                             100, 100, 20, np.NaN, 0, 0, 10, 50, 50, 30, 0, 10, 30, 0, 30])
+    max_rho = {'key': max_rho_data}
+    plot_rho(max_rho, lons[:50], lats[:50])
     
     print 'done'

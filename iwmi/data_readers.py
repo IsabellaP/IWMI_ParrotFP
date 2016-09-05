@@ -7,6 +7,7 @@ from datetime import datetime
 from pygrids.warp5 import DGGv21CPv20
 from rsdata.WARP.interface import WARP
 from warp_data.interface import init_grid
+from pygeogrids.grids import BasicGrid
 import matplotlib.pyplot as plt
 
 
@@ -306,9 +307,97 @@ def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
     return df
 
 
+def read_poets_nc(poets_path, start_date, end_date, gpi=None, lon=None, 
+                  lat=None):
+    
+    if gpi is not None:
+        grid = init_poets_grid()
+        lon, lat = grid.gpi2lonlat(gpi)
+    
+    with Dataset(poets_path, "r") as ncfile:
+        unit_temps = ncfile.variables['time'].units
+        nctime = ncfile.variables['time'][:]
+        try:
+            cal_temps = ncfile.variables['time'].calendar
+        except AttributeError : # Attribute doesn't exist
+            cal_temps = u"gregorian" # or standard
+    
+        timestamp = num2date(nctime, units = unit_temps, calendar = cal_temps)
+        date_idx = np.where((timestamp >= start_date) & 
+                            (timestamp <= end_date))[0]
+        
+        # find nearest lonlat
+        lons = ncfile.variables['lon'][:]
+        lats = ncfile.variables['lat'][:]
+        nearest_lon = find_nearest(lons, lon)
+        nearest_lat = find_nearest(lats, lat)
+        lon_idx = np.where(lons==nearest_lon)[0]
+        lat_idx = np.where(lats==nearest_lat)[0]
+        
+        ndvi = ncfile.variables['NDVI_dataset'][date_idx, lat_idx, lon_idx]
+        swi1 = ncfile.variables['SWI_SWI_001'][date_idx, lat_idx, lon_idx]
+        swi2 = ncfile.variables['SWI_SWI_010'][date_idx, lat_idx, lon_idx]
+        swi3 = ncfile.variables['SWI_SWI_020'][date_idx, lat_idx, lon_idx]
+        swi4 = ncfile.variables['SWI_SWI_040'][date_idx, lat_idx, lon_idx]
+        swi5 = ncfile.variables['SWI_SWI_060'][date_idx, lat_idx, lon_idx]
+        swi6 = ncfile.variables['SWI_SWI_100'][date_idx, lat_idx, lon_idx]
+    
+    ndvi = np.vstack(ndvi)[:,0]
+    ndvi[(ndvi==-99)] = np.NaN
+    
+    swi1 = np.vstack(swi1)[:,0]
+    swi2 = np.vstack(swi2)[:,0]
+    swi3 = np.vstack(swi3)[:,0]
+    swi4 = np.vstack(swi4)[:,0]
+    swi5 = np.vstack(swi5)[:,0]
+    swi6 = np.vstack(swi6)[:,0]
+    
+    ndvi = pd.DataFrame(ndvi, columns=['NDVI'], index=timestamp[date_idx])
+    swi1 = pd.DataFrame(swi1, columns=['SWI_001'], index=timestamp[date_idx])
+    swi2 = pd.DataFrame(swi2, columns=['SWI_010'], index=timestamp[date_idx])
+    swi3 = pd.DataFrame(swi3, columns=['SWI_020'], index=timestamp[date_idx])
+    swi4 = pd.DataFrame(swi4, columns=['SWI_040'], index=timestamp[date_idx])
+    swi5 = pd.DataFrame(swi5, columns=['SWI_060'], index=timestamp[date_idx])
+    swi6 = pd.DataFrame(swi6, columns=['SWI_100'], index=timestamp[date_idx])
+
+    return ndvi, swi1, swi2, swi3, swi4, swi5, swi6
+
+
 def find_nearest(array, element):
     idx = (np.abs(array-element)).argmin()
     return array[idx]
+
+
+def init_SWI_grid(fpath=None):
+    
+    if fpath is None:
+        fpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\20070701"
+    fname = "g2_BIOPAR_SWI10_200707010000_GLOBE_ASCAT_V3_0_1.nc"
+    with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
+        lon = ncfile.variables['lon'][:]
+        lat = ncfile.variables['lat'][:]
+        mask = (ncfile.variables["SWI_010"][:]).mask
+
+    lons, lats = np.meshgrid(lon, lat)
+    grid = BasicGrid(lons[np.where(mask == False)], lats[np.where(mask == False)])
+    
+    return grid
+
+
+def init_poets_grid(fpath=None):
+    
+    if fpath is None:
+        fpath = "C:\\Users\\i.pfeil\\Desktop\\poets\\DATA\\"
+    fname = "West_SA_0.4_dekad.nc"
+    with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
+        lon = ncfile.variables['lon'][:]
+        lat = ncfile.variables['lat'][:]
+        mask = ncfile.variables['SWI_SWI_001'][0,:,:].mask
+
+    lons, lats = np.meshgrid(lon, lat)
+    grid = BasicGrid(lons[np.where(mask == False)], lats[np.where(mask == False)])
+    
+    return grid
 
 
 if __name__ == '__main__':
@@ -318,13 +407,16 @@ if __name__ == '__main__':
     #gpis_df = pd.read_csv(gpi_path)
 
     # set paths to datasets
-    ssm_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
-    lcpath = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
-    ndvi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI\\"
-    ndvi300_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
-    lai_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\LAI\\"
-    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\"
-    fapar_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
+    ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
+    lcpath = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-2010-v1.6.1.nc"
+    ndvi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI\\"
+    ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
+    lai_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\"
+    swi_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\SWI\\"
+    fapar_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
+    poets_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\DATA\\West_SA_0.4_dekad.nc"
+    
+    #read_poets_nc(poets_path)
     
     datasets = ['NDVI']
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 

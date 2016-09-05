@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from pytesmo.temporal_matching import matching
 from pytesmo.scaling import scale
 import pytesmo.metrics as metrics
-from iwmi.data_analysis import rescale_peng
+from data_analysis import rescale_peng
 
 
 def read_cfg(cfg_file, include_default=True, only_default=False):
@@ -257,63 +257,53 @@ def read_HOAL_raw(path):
     return box22_df
 
 
-def rescale_df(ascat_ssm, FP_df):
+def rescale_df(ascat_ssm, FP_df, hoal_df):
     ascat_ssm['ssm_ascat'] = ascat_ssm['ssm_ascat']*0.54
-    ascat_ssm.plot()
-    plt.show()
+    #ascat_ssm.plot()
+    #plt.show()
     
-    matched_data = matching(ascat_ssm, FP_df['Parrot_vwc'])
+    matched_data = matching(ascat_ssm, FP_df['Parrot_vwc'], hoal_df)
     matched_data.plot()
+    plt.title('Matched data: ASCAT, FP, HOAL')
     plt.show()
     
-    scaled_data = scale(matched_data, method="mean_std")
+    scaled_data = scale(matched_data)#, method="mean_std")
     
     scaled_data.plot()
     plt.title('Satellite and in-situ soil moisture, HOAL Petzenkirchen')
     plt.ylabel('Volumetric Water Content [%]')
+    plt.ylim([0,60])
     plt.show()
 
 
-def calc_rho(ascat_ssm, FP_df, hoal_df, hoal_raw):
+def calc_rho(ascat_ssm, FP_df, hoal_df):
     # multiply ASCAT with porosity (0.54) to get same units
     ascat_ssm['ssm_ascat'] = ascat_ssm['ssm_ascat']*0.54
     
-    # in welcher Reihenfolge matchen
-    data_together1 = matching(FP_df, ascat_ssm, hoal_df, hoal_raw)
-    data_together = matching(ascat_ssm, FP_df, hoal_df, hoal_raw)
-    data_together2 = matching(FP_df, hoal_df)
-    print('ref: FP', data_together)
-    print('ref: ASCAT', data_together1)
+    matched_data = matching(ascat_ssm, FP_df['Parrot_vwc'], 
+                            hoal_df['HOAL_sm0.05'])
+    matched_data.plot()
+    plt.title('Matched data: ASCAT, FP, HOAL')
+    plt.show()
+    
+    data_together = scale(matched_data)#, method="mean_std")
     
     ascat_rho = metrics.spearmanr(data_together['Parrot_vwc'].iloc[:-3], 
                                   data_together['ssm_ascat'].iloc[:-3])
     
     hoal_rho_sm = metrics.spearmanr(data_together['Parrot_vwc'].iloc[:-3], 
                                     data_together['HOAL_sm0.05'].iloc[:-3])
-    hoal_rho_ts = metrics.spearmanr(data_together['air_temperature_'+
-                                                       'celsius'].iloc[:-3], 
-                                    data_together['HOAL_ts0.05'].iloc[:-3])
-    hoal_raw_rho_sm = metrics.spearmanr(data_together['Parrot_vwc'].iloc[:-3], 
-                                    data_together['HOAL_raw_sm1'].iloc[:-3])
     
-    print ascat_rho
-    print hoal_rho_sm
-    print hoal_rho_ts
-    print hoal_raw_rho_sm
-
     exclude = ['HOAL_ts0.05', 'air_temperature_celsius', 'par_umole_m2s',
                'merge_key']
     data_together.ix[:, data_together.columns.difference(exclude)].plot()
-    plt.title('Satellite and in-situ soil moisture, HOAL Petzenkirchen, station 22'+
-              '\n rho_ASCAT_Parrot: '+str(np.round(ascat_rho[0],3))+
-              ', rho_HOAL_Parrot: '+str(np.round(hoal_rho_sm[0],3))+
-              ', rho_HOAL_raw_Parrot: '+str(np.round(hoal_raw_rho_sm[0],3)))
-    plt.ylabel('Volumetric Water Content [%]')
-    plt.show()
-    
-    data_together1.ix[:, data_together1.columns.difference(exclude)].plot()
-    plt.show()
-    data_together2.ix[:, data_together2.columns.difference(exclude)].plot()
+    plt.title('Satellite and in-situ soil moisture, HOAL Petzenkirchen, station 22',
+              fontsize=24)
+              #+'\n rho_ASCAT_Parrot: '+str(np.round(ascat_rho[0],3))+
+              #', rho_HOAL_Parrot: '+str(np.round(hoal_rho_sm[0],3)))
+    plt.ylabel('Volumetric Water Content [%]',fontsize=20)
+    plt.tick_params(axis='both', which='major', labelsize=18)
+    plt.ylim([0,60])
     plt.show()
 
 
@@ -339,8 +329,8 @@ if __name__ == '__main__':
                                       '0_IWMI_DATASETS\\ascat_ssm.csv')
     #hoal_raw = read_HOAL_raw('C:\\Users\\i.pfeil\\Documents\\'+
     #                         '0_IWMI_DATASETS\\HOAL_raw\\')
-    #hoal_df = read_HOAL('C:\\Users\\i.pfeil\\Documents\\'+
-    #                    '0_IWMI_DATASETS\\HOAL\\')
+    hoal_df = read_HOAL('C:\\Users\\i.pfeil\\Documents\\'+
+                        '0_IWMI_DATASETS\\HOAL\\')
     
     # windows paths
     #cfg_path = 'D:\IWMI\FP_credentials.txt'
@@ -368,9 +358,22 @@ if __name__ == '__main__':
         except TypeError:
             break
     
-    ascat_ssm = rescale_peng(ascat_ssm)
-    FP_df = rescale_peng(FP_df)
-    #rescale_df(ascat_ssm, FP_df)
-    #calc_rho(ascat_ssm, FP_df, hoal_df, hoal_raw)
+    #===========================================================================
+    # # bias raus??
+    # end = np.where(FP_df['Parrot_vwc'] == 0)[0][0]
+    # ascat_ub = ascat_ssm - ascat_ssm.mean()
+    # FP_ub = FP_df['Parrot_vwc'].iloc[:end] - FP_df['Parrot_vwc'].iloc[:end].mean()
+    # hoal_ub = hoal_df['HOAL_sm0.05'] - hoal_df['HOAL_sm0.05'].mean()
+    # 
+    # ascat = rescale_peng(ascat_ub, np.nanmin(ascat_ub), np.nanmax(ascat_ub))
+    # FP = rescale_peng(FP_ub, np.nanmin(FP_ub), np.nanmax(FP_ub))
+    # hoal = rescale_peng(hoal_ub, np.nanmin(hoal_ub), np.nanmax(hoal_ub))
+    # matched_data = matching(ascat, FP, hoal)
+    # 
+    # matched_data.plot()
+    # plt.show()
+    #===========================================================================
+    
+    calc_rho(ascat_ssm, FP_df, hoal_df)
     
     print 'Finished'
