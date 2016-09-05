@@ -3,12 +3,12 @@ from datetime import datetime
 from poets.poet import Poet
 
 # poets attributes:
-rootpath = os.path.join('C:\\', 'Users', 'i.pfeil', 'Desktop', 'poets')
-shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Documents', 
-                         '0_IWMI_DATASETS', 'shapefiles', 'IND_adm', 'IND_adm1')
-regions = ['Maharashtra'] # CE...Sri Lanka, IN...India
-spatial_resolution = 0.4
-temporal_resolution = 'monthly'
+rootpath = 'C:\Users\s.hochstoger\Desktop\poets'
+shapefile = os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
+                         'poets', 'Box_West_SA', 'West_SA_cl2')
+regions = ['West_SA'] # CE...Sri Lanka, IN...India
+spatial_resolution = 0.00416785
+temporal_resolution = 'dekad'
 start_date = datetime(2007, 7, 1)
 nan_value = -99
 
@@ -27,28 +27,40 @@ p = Poet(rootpath, regions, spatial_resolution, temporal_resolution,
 # directory = "/gs/MOD11C1_D_LSTDA/"
 # begin_date = datetime(2007, 1, 1)
 # nan_value = 255
-#    
+#
 # # initializing the data source:
 # p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
 #===============================================================================
-   
-   
-name = 'LAI'
-filename = "g2_BIOPAR_LAI_QL_{YYYY}{MM}{DD}0000_VGT_V1.3.tiff"
-filedate = {'YYYY': (17, 21), 'MM': (21, 23), 'DD': (23, 25)}
+
+#
+# name = 'LAI'
+# filename = "g2_BIOPAR_LAI_QL_{YYYY}{MM}{DD}0000_VGT_V1.3.tiff"
+# filedate = {'YYYY': (17, 21), 'MM': (21, 23), 'DD': (23, 25)}
+# temp_res = 'daily'
+# host = "neoftp.sci.gsfc.nasa.gov"
+# protocol = 'FTP'
+# directory = "/gs/MOD11C1_D_LSTDA/"
+# begin_date = datetime(2007, 7, 1)
+# nan_value = 255
+#
+# p.add_source(name, filename, filedate, temp_res, host, protocol,
+#              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
+
+name = 'VCI'
+filename = "VCI_{YYYY}_{MM}_{DD}.tif"
+filedate = {'YYYY': (4, 8), 'MM': (9, 11), 'DD': (12, 14)}
 temp_res = 'daily'
 host = "neoftp.sci.gsfc.nasa.gov"
 protocol = 'FTP'
 directory = "/gs/MOD11C1_D_LSTDA/"
-begin_date = datetime(2007, 7, 1)
+begin_date = datetime(2007, 1, 1)
 nan_value = 255
-    
+
 p.add_source(name, filename, filedate, temp_res, host, protocol,
              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
-
-
-#===============================================================================
+#
+#
 # name = 'FAPAR'
 # filename = "g2_BIOPAR_FAPAR_QL_{YYYY}{MM}{DD}0000_VGT_V1.3.tiff"
 # filedate = {'YYYY': (19, 23), 'MM': (23, 25), 'DD': (25, 27)}
@@ -58,28 +70,27 @@ p.add_source(name, filename, filedate, temp_res, host, protocol,
 # directory = "/gs/MOD11C1_D_LSTDA/"
 # begin_date = datetime(2007, 1, 1)
 # nan_value = 255
-#     
+#
 # p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
-#===============================================================================
-
-  
-name = 'SWI'
-filename = "g2_BIOPAR_SWI10_QL_200707110000_GLOBE_ASCAT_V3_0_1.tiff"
-filedate = {'YYYY': (19, 23), 'MM': (23, 25), 'DD': (25, 27)}
-temp_res = 'daily'
-host = "neoftp.sci.gsfc.nasa.gov"
-protocol = 'FTP'
-directory = "/gs/MOD11C1_D_LSTDA/"
-begin_date = datetime(2007, 7, 1)
-nan_value = 255
-  
-p.add_source(name, filename, filedate, temp_res, host, protocol,
-             begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
+#
+#
+# name = 'SWI'
+# filename = "g2_BIOPAR_SWI10_QL_200707110000_GLOBE_ASCAT_V3_0_1.tiff"
+# filedate = {'YYYY': (19, 23), 'MM': (23, 25), 'DD': (25, 27)}
+# temp_res = 'daily'
+# host = "neoftp.sci.gsfc.nasa.gov"
+# protocol = 'FTP'
+# directory = "/gs/MOD11C1_D_LSTDA/"
+# begin_date = datetime(2007, 1, 1)
+# nan_value = 255
+#
+# p.add_source(name, filename, filedate, temp_res, host, protocol,
+#              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
  
 # for all sources:
-begin = datetime(2007,7,1)
-end = datetime(2010,12,31)
-#p.resample(begin=begin, end=end)
+begin = datetime(2007, 1, 1)
+end = datetime(2015, 12, 31)
+p.resample(begin=begin, end=end)
 
 p.start_app()

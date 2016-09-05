@@ -2,49 +2,129 @@ import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from data_readers import read_img
+from readers import read_img, read_ts, find_nearest, read_WARP_dataset
+from data_readers import read_imgg, read_tss
 from netCDF4 import Dataset, num2date
 from mpl_toolkits.basemap import Basemap
-from pygrids.warp5 import DGGv21CPv20
-from rsdata.WARP.interface import WARP
-from warp_data.interface import init_grid
+import fnmatch
+import gdal
+from pygeogrids.grids import BasicGrid
 import matplotlib.pyplot as plt
-import pytesmo.scaling as scaling
-import pytesmo.temporal_matching as temp_match
-import pytesmo.metrics as metrics
-from pytesmo.time_series.anomaly import calc_anomaly, calc_climatology
-from scipy import spatial
+
+
+def init_0_1_grid(str):
+    '''
+    Parameters:
+    -----------
+    str : str
+        NDVI, SWI - which grid is needed
+
+    Returns:
+    --------
+    gird : BasicGrid
+    '''
+    if str == 'SWI':
+        fpath = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\20070701"
+        fname = "g2_BIOPAR_SWI10_200707010000_GLOBE_ASCAT_V3_0_1.nc"
+        with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
+            lon = ncfile.variables['lon'][:]
+            lat = ncfile.variables['lat'][:]
+            mask = (ncfile.variables["SWI_010"][:]).mask
+        lons, lats = np.meshgrid(lon, lat)
+        grid = BasicGrid(lons[np.where(mask == False)], lats[np.where(mask == False)])
+
+    elif (str == 'NDVI') | (str == 'LAI'):
+        fpath = "C:\\Users\\s.hochstoger\\Desktop\\poets\\DATA"
+        fname = "West_SA_0.1_dekad_NDVI.nc"
+        with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
+            lon = ncfile.variables['lon'][:]
+            lat = ncfile.variables['lat'][:]
+            if str == 'NDVI':
+                mask = (ncfile.variables['NDVI_dataset'][10]).mask
+            else:
+                mask = (ncfile.variables['NDVI_dataset'][29]).mask
+        lons, lats = np.meshgrid(lon, lat)
+        grid = BasicGrid(lons[np.where(mask == False)], lats[np.where(mask == False)])
+
+    return grid
 
 def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
+    '''
 
-    folders = os.listdir(path)
-    swi = 'SWI_' + str(t).zfill(3)
+    Reads all pixel of given area and returns the mean value per day
+    for this area.
+
+    Parameters:
+    -----------
+    path : str
+        Path to stacked netcdf file
+    param : str
+        Parameter to be read (name as in nc-files).
+    lat/lon_min/max : float, optional
+        Bounding box coordinates, area to be read
+    t : int, optional
+        T-value of SWI, default=1
+
+    Returns:
+    --------
+    data : pd.DataFrame
+        Dataset containing mean value of whole area for each date
+    '''
+    with Dataset(path, "r") as ncfile:
+        unit_temps = ncfile.variables['time'].units
+        nctime = ncfile.variables['time'][:]
+        try:
+            cal_temps = ncfile.variables['time'].calendar
+        except AttributeError:  # Attribute doesn't exist
+            cal_temps = u"gregorian"  # or standard
+
+        all_dates = num2date(nctime, units=unit_temps, calendar=cal_temps)
+
+    if param == 'SWI':
+        param = 'SWI_' + str(t).zfill(3)
     mean = []
     dates = []
-    for day in folders:
-        date = datetime.strptime(day, '%Y%m%d')
+    for day in all_dates:
         data = read_img(path, param=param, lat_min=lat_min, lat_max=lat_max,
-                        lon_min=lon_min, lon_max=lon_max, timestamp=date, plot_img=False,
-                        swi=swi)
-        #if np.where(ndvi.data == 255)[0].size > 25000:
-        #    mean = np.NAN
+                        lon_min=lon_min, lon_max=lon_max, timestamp=day)
         if np.ma.is_masked(data):
             mean_value = data.data[np.where(data.data != 255)].mean()
         else:
             mean_value = data.mean()
         mean.append(mean_value)
-        dates.append(date)
+        dates.append(day)
+        # if day.day == 24:
+        #     dates.append(day.replace(day=23))
+        # elif day.day == 22:
+        #     dates.append(day.replace(day=23))
+        # elif day.day == 21:
+        #     dates.append(day.replace(day=23))
+        # else:
+        #     dates.append(day)
 
     data_df = {param: mean}
     df = pd.DataFrame(data=data_df, index=dates)
     if df.columns == 'SWI':
-        df.columns = [swi]
+        df.columns = [param]
 
     return df
 
-
+# ToDo: check if grouping works correctly, because of different dates each month for NDVI
 def anomaly(df):
+    '''
+    Calculates anomalies for time series. Of each day mean value of
+    this day over all years is subtracted.
 
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        DataFrame
+
+    Returns:
+    --------
+    data : pd.DataFrame
+        Dataset containing anomalies of input DataFrame
+    '''
     group = df.groupby([df.index.month, df.index.day])
     m = {}
     df_anomaly = df.copy()
@@ -62,10 +142,9 @@ def anomaly(df):
 
 
 def plot_anomaly(df, df_anom):
-
     if df_anom.columns[0][0:3] == 'SWI':
-        df_anom = df_anom/100
-        df = df/100
+        df_anom = df_anom / 100
+        df = df / 100
         ax = df_anom.plot.area(stacked=False, figsize=[20, 15], color='b')
         df.plot(ax=ax, color='b')
         plt.title(df.columns[0] + ' and ' + df_anom.columns[0])
@@ -77,8 +156,8 @@ def plot_anomaly(df, df_anom):
     plt.axhline(0, color='black')
     plt.ylim([-0.5, 1])
 
-def plot_area(lon_min, lon_max, lat_min, lat_max):
 
+def plot_area(lon_min, lon_max, lat_min, lat_max):
     path_to_nc_cop = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI\\20070703'
     fname_cop = 'g2_BIOPAR_NDVI_200707030000_ASIA_VGT_V1_3.nc'
     with Dataset(os.path.join(path_to_nc_cop, fname_cop), mode='r') as ncfile:
@@ -94,49 +173,426 @@ def plot_area(lon_min, lon_max, lat_min, lat_max):
                      (cop_grid_lons <= lon_max) &
                      (cop_grid_lons >= lon_min))
 
-    map = Basemap(projection='cyl', llcrnrlon=lons.min(), llcrnrlat=lats.min(), urcrnrlat=lats.max(), urcrnrlon=lons.max())
+    map = Basemap(projection='cyl', llcrnrlon=lons.min(), llcrnrlat=lats.min(), urcrnrlat=lats.max(),
+                  urcrnrlon=lons.max())
     map.drawmapboundary()
     map.drawcoastlines()
     map.drawcountries()
 
     map.plot(cop_grid_lons[index], cop_grid_lats[index], marker='+', linewidth=0, color='m', markersize=5)
 
+def plot_ts_anomalies(lat_min, lat_max, lon_min, lon_max):
+    #======================== plot TS anomalies ===========
+    ndvi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\NDVI_stack.nc"
+    lai_path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\LAI_stack.nc'
+    fapar_path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\FAPAR_stack.nc'
+    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc"
 
-
-if __name__ == '__main__':
-
-    ndvi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\VIs\\NDVI\\"
-    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\"
-
-    lat_min = 19.20
-    lat_max = 19.437
-    lon_min = 74.86
-    lon_max = 75.13
-
-    plot_area(lon_min, lon_max, lat_min, lat_max)
-    plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + 'area.png')
+    #plot_area(lon_min, lon_max, lat_min, lat_max)
+    #plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + 'area.png')
 
     df_ndvi = read_ts_area(ndvi_path, "NDVI", lat_min, lat_max, lon_min, lon_max)
-
-    df_swi1 = read_ts_area(swi_path, "SWI", lat_min, lat_max, lon_min, lon_max, 1)
-    df_swi5 = read_ts_area(swi_path, "SWI", lat_min, lat_max, lon_min, lon_max, 5)
-    df_swi10 = read_ts_area(swi_path, "SWI", lat_min, lat_max, lon_min, lon_max, 10)
-    df_swi15 = read_ts_area(swi_path, "SWI", lat_min, lat_max, lon_min, lon_max, 15)
-    df_swi20 = read_ts_area(swi_path, "SWI", lat_min, lat_max, lon_min, lon_max, 20)
-    df_swi40 = read_ts_area(swi_path, "SWI", lat_min, lat_max, lon_min, lon_max, 40)
-    df_swi60 = read_ts_area(swi_path, "SWI", lat_min, lat_max, lon_min, lon_max, 60)
-    df_swi100 = read_ts_area(swi_path, "SWI", lat_min, lat_max, lon_min, lon_max, 100)
-
-    swis = [df_swi1, df_swi5, df_swi10, df_swi15, df_swi20, df_swi40, df_swi60, df_swi100]
-
     anomaly_ndvi = anomaly(df_ndvi)
     plot_anomaly(df_ndvi.loc[:'20140403'], anomaly_ndvi.loc[:'20140403'])
     plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + df_ndvi.columns[0] + '.png')
 
-    for swi in swis:
-        anomaly_swi = anomaly(swi)
-        plot_anomaly(swi.loc[:'20140403'], anomaly_swi.loc[:'20140403'])
-        plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + swi.columns[0] + '.png')
+    df_lai = read_ts_area(lai_path, "LAI", lat_min, lat_max, lon_min, lon_max)
+    anomaly_lai = anomaly(df_lai/7)
+    plot_anomaly(df_lai/7, anomaly_lai)
+    plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + df_lai.columns[0] + '.png')
 
-    plt.show()
+    df_fapar = read_ts_area(fapar_path, "FAPAR", lat_min, lat_max, lon_min, lon_max)
+    anomaly_fapar = anomaly(df_fapar)
+    plot_anomaly(df_fapar.loc[:'20140403'], anomaly_fapar.loc[:'20140403'])
+    plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + df_fapar.columns[0] + '.png')
+
+    tt = [1, 5, 10, 15, 20, 40, 60, 100]
+    for t in tt:
+        df_swi = read_ts_area(swi_path, 'SWI_' + str(t).zfill(3), lat_min, lat_max, lon_min, lon_max)
+        anomaly_swi = anomaly(df_swi)
+        plot_anomaly(df_swi.loc[:'20140403'], anomaly_swi.loc[:'20140403'])
+        plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + df_swi.columns[0] + '.png')
+
+
+def calc_monthly_mean(param):
+    grid = init_0_1_grid(param)
+    gps = grid.get_bbox_grid_points(14.7148, 29.3655, 68.15, 81.8419)
+    if param == 'NDVI':
+        path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_NDVI.nc'
+        means = _get_monthly_mean(path, param, grid, gps, t=None)
+        means.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_NDVI.csv")
+    elif param == "LAI":
+        path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_LAI.nc'
+        means = _get_monthly_mean(path, param, grid, gps, t=None)
+        means.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_LAI.csv")
+    elif param == 'SWI':
+        t = [1, 5, 10, 15, 20, 40, 60, 100]
+        path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc"
+        for tt in t:
+            means = _get_monthly_mean(path, param, grid, gps, t=tt)
+            means.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_SWI_" + str(tt).zfill(3) + ".csv")
+            print 'finished SWI ' + str(tt).zfill(3)
+    return means
+
+def _get_monthly_mean(path, param, grid, gpi, t=None):
+    if param == 'SWI':
+        param = param + '_' + str(t).zfill(3)
+        startdate = datetime(2007, 7, 1)
+        enddate = datetime(2016, 7, 1)
+    elif param == 'LAI':
+        param = param + '_dataset'
+        startdate = datetime(2007, 7, 3)
+        enddate = datetime(2013, 12, 3)
+    elif param == 'NDVI':
+        param = param + '_dataset'
+        startdate = datetime(2007, 1, 1)
+        enddate = datetime(2014, 5, 13)
+    columns = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
+    df_mean = pd.DataFrame([], index=[-999], columns=columns)
+    size = gpi.size
+    for gp in gpi:
+        lon, lat = grid.gpi2lonlat(gp)
+        ts = read_ts(path, param=param, lon=lon, lat=lat, start_date=startdate,
+                     end_date=enddate)
+        ts[(ts == -99) | (ts == 255)] = np.NaN
+        monthly = ts.resample('M').mean()
+        group_month = monthly.groupby([monthly.index.month])
+        mean = group_month.mean().transpose()
+
+        mean = pd.DataFrame([mean.values[0]], index=[gp], columns=df_mean.columns)
+        df_mean = df_mean.append(mean)
+
+        done = (np.where(gpi == gp)[0][0])
+        if done % 160 == 0:
+            print done/float(size) * 100
+
+    df_mean = df_mean[df_mean.index != -999]
+
+    if param == 'SWI' + '_' + str(t).zfill(3):
+        return df_mean
+    elif param == 'NDVI_dataset':
+        return df_mean/250
+    elif param == 'LAI_dataset':
+        return df_mean/210
+
+def study_area_gpis():
+    #=========STUDY AREA GRID POINTS ============
+    gpi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\pointlist_India_warp.csv"
+    gpis = pd.read_csv(gpi_path)
+    gpi_path_p = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\pointlist_Pakistan_warp.csv"
+    gpis_p = pd.read_csv(gpi_path_p)
+    gpis = gpis.append(gpis_p)
+
+    grid = BasicGrid(gpis.lon, gpis.lat, gpis.point)
+    gpis = grid.get_bbox_grid_points(14.7148, 29.3655, 68.15, 81.8419)
+    lon, lat = grid.get_bbox_grid_points(14.7148, 29.3655, 68.15, 81.8419, coords=True)
+    gp = pd.DataFrame(gpis, columns=['gpi'])
+    lon = pd.DataFrame(lon, columns=['lon'])
+    lat = pd.DataFrame(lat, columns=['lat'])
+    gplon = pd.concat([gp, lon], axis=1)
+    gplonlat = pd.concat([gplon, lat], axis=1)
+    gplonlat.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\study_area_gp_lonlat_new.csv")
+    pass
+
+def read_img_new(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
+             lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2010, 7, 1),
+             plot_img=False, swi='SWI_001'):
+    """
+    Parameters:
+    -----------
+    path : str
+        Path to nc-data
+    param : str, optional
+        Parameter to be read (name as in nc-files). Default: NDVI
+    lat/lon_min/max : float, optional
+        Bounding box coordinates, default: Sri Lanka
+    timestamp : datetime.datetime, optional
+        Timestamp of image, default: 01/01/2014
+    plot_img : bool, optional
+        If true, result image is plotted, default: False
+
+    Returns:
+    --------
+    data : dict
+        Dataset
+    """
+
+    timestamp_array = []
+    folders = os.listdir(path)
+
+    if param == 'NDVI300':
+        for fname in sorted(folders):
+            year = int(fname[8:12])
+            month = int(fname[12:14])
+            day = int(fname[14:16])
+            timestamp_array.append(datetime(year, month, day))
+
+    else:  # NDVI, LAI, SWI
+        for fname in sorted(folders):
+            year = int(fname[0:4])
+            month = int(fname[4:6])
+            day = int(fname[6:8])
+            timestamp_array.append(datetime(year, month, day))
+
+    timestamp_array = np.array(timestamp_array)
+    # find nearest timestamp
+    nearest_date = find_nearest(timestamp_array, timestamp)
+    date_idx = np.where(timestamp_array == nearest_date)[0]
+
+    folder = np.array(sorted(folders))[date_idx][0]
+    fpath = os.path.join(path, folder)
+    fname = fnmatch.filter(os.listdir(fpath), '*.nc')[0]
+    grid = init_0_1_grid('SWI')
+
+    if param == 'SWI':
+        # possible variables: SWI_001, 005, 010, 015, 020, 040, 060, 100
+        key = swi
+    elif param == 'NDVI300':
+        key = 'NDVI'
+    else:
+        key = param
+
+    with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
+        lon = ncfile.variables['lon'][:]
+        lat = ncfile.variables['lat'][:]
+
+        lat_idx = np.where((lat >= lat_min) & (lat <= lat_max))[0]
+        lon_idx = np.where((lon >= lon_min) & (lon <= lon_max))[0]
+        lon_data = lon[lon_idx]
+        lat_data = lat[lat_idx]
+        mesh = np.meshgrid(lon_data, lat_data)
+        mesh = zip(mesh[0].flatten(), mesh[1].flatten())
+        gps = []
+        for point in mesh:
+            gp = grid.find_nearest_gpi(point[0], point[1])[0]
+            gps.append(gp)
+        param_data = ncfile.variables[key][lat_idx, lon_idx]
+
+    return param_data, gps, lon_data, lat_data
+
+
+def read_poets_nc(poets_path, start_date, end_date, gpi=None, lon=None,
+                  lat=None):
+
+    if gpi is not None:
+        grid = init_0_1_grid('NDVI')
+        lon, lat = grid.gpi2lonlat(gpi)
+
+    with Dataset(poets_path, "r") as ncfile:
+        unit_temps = ncfile.variables['time'].units
+        nctime = ncfile.variables['time'][:]
+        try:
+            cal_temps = ncfile.variables['time'].calendar
+        except AttributeError:  # Attribute doesn't exist
+            cal_temps = u"gregorian"  # or standard
+
+        timestamp = num2date(nctime, units=unit_temps, calendar=cal_temps)
+        date_idx = np.where((timestamp >= start_date) &
+                            (timestamp <= end_date))[0]
+
+        # find nearest lonlat
+        lons = ncfile.variables['lon'][:]
+        lats = ncfile.variables['lat'][:]
+        nearest_lon = find_nearest(lons, lon)
+        nearest_lat = find_nearest(lats, lat)
+        lon_idx = np.where(lons == nearest_lon)[0]
+        lat_idx = np.where(lats == nearest_lat)[0]
+        ndvi = ncfile.variables['NDVI_dataset'][date_idx, lat_idx, lon_idx]
+
+    if np.ma.is_masked(ndvi):
+        ndvi = ndvi.flatten().data
+    else:
+        ndvi = ndvi.flatten()
+
+    ndvi[(ndvi == -99)] = np.NaN
+
+    ndvi = pd.DataFrame(ndvi/250, columns=['NDVI'], index=timestamp[date_idx])
+
+    return ndvi
+
+
+def read_poets_nc_img(poets_path, date, lat_min, lat_max, lon_min, lon_max):
+
+    grid = init_0_1_grid('LAI')
+    with Dataset(poets_path, "r") as ncfile:
+        unit_temps = ncfile.variables['time'].units
+        nctime = ncfile.variables['time'][:]
+        try:
+            cal_temps = ncfile.variables['time'].calendar
+        except AttributeError:  # Attribute doesn't exist
+            cal_temps = u"gregorian"  # or standard
+
+        timestamp = num2date(nctime, units=unit_temps, calendar=cal_temps)
+        nearest_date = find_nearest(timestamp, date)
+        date_idx = np.where(timestamp == nearest_date)[0]
+
+        # find nearest lonlat
+        lons = ncfile.variables['lon'][:]
+        lats = ncfile.variables['lat'][:]
+
+        lat_idx = np.where((lats >= lat_min) & (lats <= lat_max))[0]
+        lon_idx = np.where((lons >= lon_min) & (lons <= lon_max))[0]
+
+        lon_data = lons[lon_idx]
+        lat_data = lats[lat_idx]
+        mesh = np.meshgrid(lon_data, lat_data)
+        mesh = zip(mesh[0].flatten(), mesh[1].flatten())
+        gps = []
+        for point in mesh:
+            gp = grid.find_nearest_gpi(point[0], point[1])[0]
+            gps.append(gp)
+        ndvi = ncfile.variables['LAI_dataset'][date_idx, lat_idx, lon_idx]
+
+
+    return ndvi, gps, lon_data, lat_data
+
+
+if __name__ == '__main__':
+
+
+    vci = read_ts("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_VCI.nc",
+            'VCI_dataset', 76.311035156, 20.014645445, start_date=datetime(2007, 7, 1), end_date=datetime(2013, 5, 31))
+    swi = read_ts("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc", 'SWI_020',
+                  76.311035156, 20.014645445, start_date=datetime(2007, 7, 1), end_date=datetime(2013, 5, 31))
+    img1 = read_img("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_VCI.nc",
+            'VCI_dataset', 14.7148, 29.3655, 68.15, 81.8419, timestamp=datetime(2010, 7, 1))
+    img2 = read_img("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_VCI.nc",
+            'VCI_dataset', 19.204, 21.74, 74, 76.5754, timestamp=datetime(2010, 7, 1))
+
+    #calc_monthly_mean('LAI')
+    #print 'finish LAI'
+    #calc_monthly_mean('NDVI')
+    #print 'finish NDVI'
+    #calc_monthly_mean("SWI")
+    #print 'finish SWI'
+
+    #plot_ts_anomalies(19.204, 21, 74, 76.5754)
+    #swi = read_ts_area("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc", 'SWI',
+    #                   18.552532366, 21.105000275, 74.619140625, 77.420654297, t=20)
+    # swi = read_ts("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\LAI_stack.nc",
+    #               param='LAI', lon=76.05, lat=29.35, start_date=datetime(2007, 7, 1),
+    #               end_date=datetime(2013, 5, 31))
+    # swi.plot()
+    #plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\swi20_smallarea.png')
+
+
+    # gg=init_0_1_grid('NDVI')
+    grid = init_0_1_grid('SWI')
+    # star_date = datetime(2007, 1, 1)
+    # end_date = datetime(2014, 5, 13)
+    # ndvi = read_poets_nc("C:\Users\s.hochstoger\Desktop\poets\DATA\West_SA_0.1_dekad.nc",
+    #                      star_date, end_date, lon=75, lat=20)
+
+    # fpath = os.path.join('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\', '20070711')
+    # fname = 'g2_BIOPAR_SWI10_200707110000_GLOBE_ASCAT_V3_0_1.nc'
+    # with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
+    #     lons = ncfile.variables['lon'][:]
+    #     lats = ncfile.variables['lat'][:]
+
+
+    #=============== map SWI anomalies for study area
+    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\"
+    years = [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015]
+    months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    days = [3, 13, 23]
+    all_means = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_SWI_040.csv')
+    all_means.index = all_means.iloc[:, 0].values
+    all_means = all_means.drop('Unnamed: 0', 1)
+
+    for year in years:
+        for month in months:
+
+            data1, gp1, lon1, lat1 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
+                                              timestamp=datetime(year, month, days[0]), swi='SWI_040')
+            data2, gp2, lon2, lat2 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
+                                              timestamp=datetime(year, month, days[1]), swi='SWI_040')
+            data3, gp3, lon3, lat3 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
+                                              timestamp=datetime(year, month, days[2]), swi='SWI_040')
+            array_all = np.ma.vstack(data1, data2, data3)
+            mean = np.ma.mean(array_all, axis=0)
+            df = pd.DataFrame(mean.data.flatten(), index=gp1, columns=[str(month)])
+            df.iloc[np.where(df == 0)[0]] = np.NAN
+
+            anom = df-all_means
+            anom = anom.dropna(axis=0, how='all')
+            anom = anom.dropna(axis=1, how='all')
+
+            grid = init_0_1_grid('SWI')
+            lon_anom = []
+            lat_anom = []
+            for gp in anom.index.values:
+                lon, lat = grid.gpi2lonlat(gp)
+                lon_anom.append(lon)
+                lat_anom.append(lat)
+
+            plt.figure(figsize=(20, 15))
+            map = Basemap(projection='cyl', llcrnrlon=68.14, llcrnrlat=14.71, urcrnrlat=29.37,
+                          urcrnrlon=81.85)
+            map.drawmapboundary()
+            map.drawcoastlines()
+            map.drawcountries()
+            #map.readshapefile("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\IND_adm1\\IND_adm1", 'IND_adm1')
+            cm = plt.cm.get_cmap('RdYlBu')
+            map.scatter(np.array(lon_anom).flatten(), np.array(lat_anom).flatten(), c=np.array(anom).flatten(),
+                        edgecolor='None', marker='s', s=75, vmin=-30, vmax=30, cmap=cm)
+            plt.colorbar()
+            plt.title('SWI Anomalies ' + str(year) + '_' + str(month).zfill(2) + ' T = 40', fontsize=21)
+            plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\' + str(year) + '_' + str(month).zfill(2) + '_anomalies_T40.png',
+                        dpi=450, bbox_inches='tight', pad_inches=0.3)
+    #=========================================
+
+    # #=============== map NDVI anomalies for study area
+    # ndvi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_LAI.nc"
+    # years = [2008, 2009, 2010, 2011, 2012, 2013]
+    # months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    # days = [10, 20, 27]
+    # all_means = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_LAI.csv')
+    # all_means.index = all_means.iloc[:, 0].values
+    # all_means = all_means.drop('Unnamed: 0', 1)
+    #
+    # for year in years:
+    #     for month in months:
+    #
+    #         data1, gp1, lon1, lat1 = read_poets_nc_img(ndvi_path, datetime(year, month, days[0]),
+    #                                                    14.7148, 29.3655, 68.15, 81.8419)
+    #         data2, gp2, lon2, lat2 = read_poets_nc_img(ndvi_path, datetime(year, month, days[1]),
+    #                                                    14.7148, 29.3655, 68.15, 81.8419)
+    #         data3, gp3, lon3, lat3 = read_poets_nc_img(ndvi_path, datetime(year, month, days[2]),
+    #                                                    14.7148, 29.3655, 68.15, 81.8419)
+    #         array_all = np.ma.vstack(data1, data2, data3)
+    #         mean = np.ma.mean(array_all, axis=0)
+    #         df = pd.DataFrame((mean.data/210).flatten(), index=gp1, columns=[str(month)])
+    #         df.iloc[np.where(df == 0)[0]] = np.NAN
+    #         df = df.dropna(axis=0, how='all')
+    #
+    #         anom = df-all_means
+    #         anom = anom.dropna(axis=0, how='all')
+    #         anom = anom.dropna(axis=1, how='all')
+    #
+    #         grid = init_0_1_grid('LAI')
+    #         lon_anom = []
+    #         lat_anom = []
+    #         for gp in anom.index.values:
+    #             lon, lat = grid.gpi2lonlat(gp)
+    #             lon_anom.append(lon)
+    #             lat_anom.append(lat)
+    #
+    #         plt.figure(figsize=(20, 15))
+    #         map = Basemap(projection='cyl', llcrnrlon=68.14, llcrnrlat=14.71, urcrnrlat=29.37,
+    #                       urcrnrlon=81.85)
+    #         map.drawmapboundary()
+    #         map.drawcoastlines()
+    #         map.drawcountries()
+    #         #map.readshapefile("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\IND_adm1\\IND_adm1", 'IND_adm1')
+    #         cm = plt.cm.get_cmap('RdYlGn')
+    #         map.scatter(np.array(lon_anom).flatten(), np.array(lat_anom).flatten(), c=np.array(anom).flatten(),
+    #                     edgecolor='None', marker='s', s=70, vmin=-0.30, vmax=0.30, cmap=cm)
+    #         plt.colorbar()
+    #         plt.title('LAI Anomalies ' + str(year) + '_' + str(month).zfill(2), fontsize=21)
+    #         plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\LAI_Spatial_Anomalies_monthly\\'
+    #                     + str(year) + '_' + str(month).zfill(2) + '_anomalies.png', dpi=450,
+    #                     bbox_inches='tight', pad_inches=0.3)
+    #=========================================
+
+
     pass
