@@ -94,7 +94,7 @@ p.add_source(name, filename, filedate, temp_res, host, protocol,
 # directory = "/gs/MOD11C1_D_LSTDA/"
 # begin_date = datetime(2010, 1, 1)
 # nan_value = 255
-#       
+#        
 # # initializing the data source:
 # p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r',
