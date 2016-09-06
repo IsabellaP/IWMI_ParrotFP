@@ -107,7 +107,7 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
     print 'Finished.'
     
     
-def read_tiff(srcpath, fname):
+def read_tiff(srcpath, fname, coord_alt=True):
     
     src_filename = os.path.join(srcpath, fname)
 
@@ -117,16 +117,31 @@ def read_tiff(srcpath, fname):
     arr = band.ReadAsArray()
     latsize, lonsize = arr.shape
     
-    # unravel GDAL affine transform parameters
-    c, a, b, f, d, e = src_ds.GetGeoTransform()
-    
-    col = np.arange(lonsize)
-    row = np.arange(latsize)
-    col_grid, row_grid = np.meshgrid(col, row)
-    
-    lons = a * col_grid + b * row_grid + a * 0.5 + b * 0.5 + c
-    lats = d * col_grid + e * row_grid + d * 0.5 + e * 0.5 + f
-
+    if not coord_alt: # falsche coord!
+        # unravel GDAL affine transform parameters
+        c, a, b, f, d, e = src_ds.GetGeoTransform()
+        
+        col = np.arange(lonsize)
+        row = np.arange(latsize)
+        col_grid, row_grid = np.meshgrid(col, row)
+        
+        lons = a * col_grid + b * row_grid + a * 0.5 + b * 0.5 + c
+        lats = d * col_grid + e * row_grid + d * 0.5 + e * 0.5 + f
+    else:
+        width = src_ds.RasterXSize
+        height = src_ds.RasterYSize
+        gt = src_ds.GetGeoTransform()
+        minx = gt[0]
+        miny = gt[3] + width*gt[4] + height*gt[5] 
+        maxx = gt[0] + width*gt[1] + height*gt[2]
+        maxy = gt[3]
+        
+        px = (maxx-minx)/lonsize
+        py = (maxy-miny)/latsize
+        
+        lons = np.arange(minx, maxx, px)
+        lats = np.arange(miny, maxy, py)
+        
     return arr, lons, lats
 
 
@@ -186,6 +201,7 @@ def merge_tiff(path, new_path, new_tiff, variable, datestr):
         for idx, tiff in enumerate(sorted(os.listdir(path))):
             print idx
             data_single, _, _ = read_tiff(path, tiff)
+            print data_single.shape
             data[idx,:,:] = data_single
             
             year = int(tiff[datestr['year'][0]:datestr['year'][1]])
@@ -218,6 +234,6 @@ if __name__ == '__main__':
     #merge_nc(out_path, new_path, ['FAPAR'], datestr)
      
     datestr = {'year': (5,9), 'month': (10,12), 'day': (13,15)} # IDSI
-    merge_tiff(out_path, new_path, 'IDSI_stack.nc', 'IDSI', datestr)
+    #merge_tiff(out_path, new_path, 'IDSI_stack.nc', 'IDSI', datestr)
     
-    
+    read_tiff(out_path, 'IDSI_2010_01_01.tif')
