@@ -10,8 +10,8 @@ shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Desktop',
                          'Isabella', 'Peejush', 'Box_West_SA', 'West_SA_cl2')
 regions = ['West_SA'] # CE...Sri Lanka, IN...India
 spatial_resolution = 0.1
-temporal_resolution = 'monthly'
-start_date = datetime(2010, 1, 1)
+temporal_resolution = 'dekad'
+start_date = datetime(2007, 1, 1)
 nan_value = -99
 
 # initializing Poet class:
@@ -19,20 +19,22 @@ p = Poet(rootpath, regions, spatial_resolution, temporal_resolution,
          start_date, nan_value, shapefile=shapefile)
 
 #source attributes:
-name = 'NDVI'
-filename = "20100101NDVI_stack.nc"
-#filedate = {'YYYY': (18, 22), 'MM': (22, 24), 'DD': (24, 26)}
-filedate = {'YYYY': (0, 4), 'MM': (4, 6), 'DD': (6, 8)}
-temp_res = 'daily'
-host = "neoftp.sci.gsfc.nasa.gov"
-protocol = 'FTP'
-directory = "/gs/MOD11C1_D_LSTDA/"
-begin_date = datetime(2010, 1, 1)
-nan_value = 255
-       
-# initializing the data source:
-p.add_source(name, filename, filedate, temp_res, host, protocol,
-             begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
+#===============================================================================
+# name = 'NDVI'
+# filename = "20100101NDVI_stack.nc"
+# #filedate = {'YYYY': (18, 22), 'MM': (22, 24), 'DD': (24, 26)}
+# filedate = {'YYYY': (0, 4), 'MM': (4, 6), 'DD': (6, 8)}
+# temp_res = 'daily'
+# host = "neoftp.sci.gsfc.nasa.gov"
+# protocol = 'FTP'
+# directory = "/gs/MOD11C1_D_LSTDA/"
+# begin_date = datetime(2010, 1, 1)
+# nan_value = 255
+#        
+# # initializing the data source:
+# p.add_source(name, filename, filedate, temp_res, host, protocol,
+#              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
+#===============================================================================
    
    
 #===============================================================================
@@ -100,10 +102,25 @@ p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r',
 #              variables=['lccs_class'])
 #===============================================================================
- 
+
+name = 'IDSI'
+filename = "IDSI_{YYYY}_{MM}_{DD}.tif"
+filedate = {'YYYY': (5, 9), 'MM': (10, 12), 'DD': (13, 15)}
+temp_res = 'daily'
+host = "neoftp.sci.gsfc.nasa.gov"
+protocol = 'FTP'
+directory = "/gs/MOD11C1_D_LSTDA/"
+begin_date = datetime(2010, 1, 1)
+nan_value = 255
+
+p.add_source(name, filename, filedate, temp_res, host, protocol,
+             begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
+
+
+
 # for all sources:
-begin = datetime(2007,1,1)
-end = datetime(2015,12,31)
+begin = datetime(2010,1,1)
+end = datetime(2010,1,11)
 p.resample(begin=begin, end=end)
 
 #p.start_app()
