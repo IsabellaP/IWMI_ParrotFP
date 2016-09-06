@@ -6,10 +6,15 @@ from poets.poet import Poet
 rootpath = 'C:\Users\s.hochstoger\Desktop\poets'
 shapefile = os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
                          'poets', 'Box_West_SA', 'West_SA_cl2')
+						 rootpath = os.path.join('C:\\', 'Users', 'i.pfeil', 'Desktop', 'poets')
+#shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Documents', 
+#                         '0_IWMI_DATASETS', 'shapefiles', 'IND_adm', 'IND_adm1')
+#shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Desktop', 
+#                         'Isabella', 'Peejush', 'Box_West_SA', 'West_SA_cl2')
 regions = ['West_SA'] # CE...Sri Lanka, IN...India
-spatial_resolution = 0.00416785
+spatial_resolution = 0.1
 temporal_resolution = 'dekad'
-start_date = datetime(2007, 7, 1)
+start_date = datetime(2007, 1, 1)
 nan_value = -99
 
 # initializing Poet class:
@@ -87,10 +92,58 @@ p.add_source(name, filename, filedate, temp_res, host, protocol,
 #
 # p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
- 
+#===============================================================================
+  
+#===============================================================================
+# name = 'SWI'
+# filename = "g2_BIOPAR_SWI10_200707110000_GLOBE_ASCAT_V3_0_1.nc"
+# filedate = {'YYYY': (16, 20), 'MM': (20, 22), 'DD': (22, 24)}
+# temp_res = 'daily'
+# host = "neoftp.sci.gsfc.nasa.gov"
+# protocol = 'FTP'
+# directory = "/gs/MOD11C1_D_LSTDA/"
+# begin_date = datetime(2007, 7, 1)
+# nan_value = 255
+#    
+# p.add_source(name, filename, filedate, temp_res, host, protocol,
+#              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r',
+#              variables=['SWI_001', 'SWI_010', 'SWI_020', 'SWI_040', 'SWI_060', 
+#                         'SWI_100'])
+#===============================================================================
+
+#===============================================================================
+# name = 'LC'
+# filename = "ESACCI-LC-L4-LCCS-Map-300m-P5Y-20100101-West_SA-v1.6.1.nc"
+# filedate = {'YYYY': (31, 35), 'MM': (35, 37), 'DD': (37, 39)}
+# temp_res = 'daily'
+# host = "neoftp.sci.gsfc.nasa.gov"
+# protocol = 'FTP'
+# directory = "/gs/MOD11C1_D_LSTDA/"
+# begin_date = datetime(2010, 1, 1)
+# nan_value = 255
+#        
+# # initializing the data source:
+# p.add_source(name, filename, filedate, temp_res, host, protocol,
+#              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r',
+#              variables=['lccs_class'])
+#===============================================================================
+
+name = 'IDSI'
+filename = "IDSI_{YYYY}_{MM}_{DD}.tif"
+filedate = {'YYYY': (5, 9), 'MM': (10, 12), 'DD': (13, 15)}
+temp_res = 'daily'
+host = "neoftp.sci.gsfc.nasa.gov"
+protocol = 'FTP'
+directory = "/gs/MOD11C1_D_LSTDA/"
+begin_date = datetime(2010, 1, 1)
+nan_value = 255
+
+p.add_source(name, filename, filedate, temp_res, host, protocol,
+             begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
+
 # for all sources:
-begin = datetime(2007, 1, 1)
-end = datetime(2015, 12, 31)
+begin = datetime(2010,1,1)
+end = datetime(2010,1,11)
 p.resample(begin=begin, end=end)
 
-p.start_app()
+#p.start_app()
