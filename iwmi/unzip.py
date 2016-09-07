@@ -21,7 +21,7 @@ def unzip(path_in, path_out):
         
         
 def format_to_folder(root, formatstr, out_path):
-    """ Looks for files of format formatstr in all subfolders of root and moves
+    """ Looks for files of format formatstr in all subfolders of root and copies
     the files to out_path
     """
     
@@ -107,7 +107,7 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
     print 'Finished.'
     
     
-def read_tiff(srcpath, fname, coord_alt=True):
+def read_tiff(srcpath, fname, coord_alt=False):
     
     src_filename = os.path.join(srcpath, fname)
 
@@ -202,7 +202,15 @@ def merge_tiff(path, new_path, new_tiff, variable, datestr):
             print idx
             data_single, _, _ = read_tiff(path, tiff)
             print data_single.shape
-            data[idx,:,:] = data_single
+            if data_single.shape == lons.shape:
+                data[idx,:,:] = data_single
+            elif data_single.shape == (148,160):
+                # hard coded for TRMM_RF
+                print idx, "dims change"
+                data[idx,4:-8,:] = data_single
+            else:
+                print "continue"
+                continue
             
             year = int(tiff[datestr['year'][0]:datestr['year'][1]])
             month = int(tiff[datestr['month'][0]:datestr['month'][1]])
@@ -221,9 +229,10 @@ if __name__ == '__main__':
      
     #unzip(path_in, path_out)
      
-    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\'
-    formatstr = '.nc'
-    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\IDSI\\'
+    root = 'C:\\Users\\i.pfeil\\Documents\\TRMM_RF\\'
+    formatstr = '.tif'
+    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\TRMM_RF\\'
+    out_path_new = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\'
     #format_to_folder(root, formatstr, out_path)
      
     new_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\'
@@ -233,7 +242,7 @@ if __name__ == '__main__':
     #datestr = {'year': (14,18), 'month': (18,20), 'day': (20,22)} # LAI
     #merge_nc(out_path, new_path, ['FAPAR'], datestr)
      
-    datestr = {'year': (5,9), 'month': (10,12), 'day': (13,15)} # IDSI
-    #merge_tiff(out_path, new_path, 'IDSI_stack.nc', 'IDSI', datestr)
+    datestr = {'year': (11,15), 'month': (16,18), 'day': (19,21)} # IDSI
+    merge_tiff(out_path, out_path_new, 'TRMM_RF_stack.nc', 'TRMM_RF', datestr)
     
-    read_tiff(out_path, 'IDSI_2010_01_01.tif')
+    #read_tiff(out_path, 'VCI_stack.tif')

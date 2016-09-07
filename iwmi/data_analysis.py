@@ -141,8 +141,8 @@ def corr(paths, corr_df, start_date, end_date, lon=None, lat=None,
                 rho, p = metrics.spearmanr(data_together[ds_water], 
                                            data_together[ds_veg])
                 # mask values with p-value > 0.05
-                #if p > 0.05:
-                #    rho = np.NaN
+                if p > 0.05:
+                    rho = np.NaN
                 if ds_veg+'_'+ds_water+'_rho' in corr_df.columns:
                     corr_df[ds_veg+'_'+ds_water+'_rho'].iloc[np.where(corr_df.index==
                                                                   time_lag)] = rho
@@ -436,7 +436,7 @@ def LC_mask(lons, lats, search_rad=80000):
     urban = (lccs_resamp == -66)    
     water = (lccs_resamp == -46)
     snow_and_ice = (lccs_resamp == -36)
-    
+        
     mask_out = ((no_data) | (urban) | (water) | (snow_and_ice))
     lccs_masked = np.ma.masked_where(mask_out, lccs_resamp)
     
@@ -446,24 +446,61 @@ def LC_mask(lons, lats, search_rad=80000):
 def plot_max_timelags(lons, lats):
     
     max_corr_val = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_val.npy')
-    scatterplot(lons, lats, max_corr_val, s=75, title=None, marker=',', 
-                discrete=True, binmin=0, binmax=1, bins=20)
-    
     max_corr_swi = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_swi.npy')
-    swi_vals = np.empty_like(max_corr_val)
+    max_corr_lag = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag.npy')
     
+    lccs_masked = LC_mask(lons, lats)
+    max_corr_val = np.ma.masked_where(lccs_masked.mask, max_corr_val)
+    max_corr_swi = np.ma.masked_where(lccs_masked.mask, max_corr_swi)
+    max_corr_lag = np.ma.masked_where(lccs_masked.mask, max_corr_lag)
+    
+    scatterplot(lons, lats, max_corr_val, s=200, title='Maximum correlation '+
+                'between SWI and NDVI', marker=',', 
+                discrete=True, binmin=0, binmax=1, bins=20, 
+                ticks=np.linspace(0,1,20))
+    
+    
+    swi_vals = np.empty_like(max_corr_val)
+     
     for idx, key in enumerate(np.unique(max_corr_swi)):
         print idx
         swi_vals[np.where(max_corr_swi == key)] = idx 
-    scatterplot(lons, lats, swi_vals, s=75, title=None, marker=',', 
-                discrete=True, binmin=0, binmax=1, bins=20)
+    scatterplot(lons, lats, swi_vals, s=200, title='SWI dataset showing '+
+                'highest correlation with NDVI', marker=',', 
+                discrete=True, binmin=0, binmax=7, bins=8, 
+                ticks=np.unique(max_corr_swi))
     
-    max_corr_lag = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag.npy')
-    scatterplot(lons, lats, max_corr_val, s=75, title=None, marker=',', 
-                discrete=True, binmin=0, binmax=1, bins=20)
+    max_corr_lag[np.where(np.isnan(max_corr_lag))[0]] = np.NaN
+    lag_vals = np.empty_like(max_corr_val)
     
+    for idx, key in enumerate(np.unique(max_corr_lag)):
+        print idx
+        lag_vals[np.where(max_corr_lag == key)] = idx 
+    scatterplot(lons, lats, lag_vals, s=200, title='Time lag showing '+
+                'highest correlation between SWI and NDVI', marker=',', 
+                discrete=True, binmin=0, binmax=8, bins=10, 
+                ticks=np.unique(max_corr_lag))
     
 
+def plot_corr_new(lons, lats):
+    
+    swi = {}
+    swi['swi001'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi001.npy')
+    swi['swi010'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi010.npy')
+    swi['swi020'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi020.npy')
+    swi['swi040'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi040.npy')
+    swi['swi060'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi060.npy')
+    swi['swi100'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi100.npy')
+
+    lccs_masked = LC_mask(lons, lats)
+
+    for key in swi:
+        swi[key] = np.ma.masked_where(lccs_masked.mask, swi[key]) 
+        scatterplot(lons, lats, swi[key], s=30, title='Correlation between '+
+                    key+' and NDVI at a timelag of 3 days', marker=',', 
+                    discrete=False, key=key)
+    
+    
 
 if __name__ == '__main__':
     
@@ -516,58 +553,73 @@ if __name__ == '__main__':
     print gpis.shape
     
     #plot_max_timelags(lons, lats)
+    #plot_corr_new(lons, lats)
       
     start_date = datetime(2007, 7, 1)
     end_date = datetime(2015, 7, 1)
     max_rho = {}
-    time_lags = [0, 10, 20, 30, 40, 50, 60, 100]
+    time_lags = [0]#, 10, 20, 30, 40, 50, 60, 100]
     corr_df = pd.DataFrame([], index=time_lags)
-     
+       
     max_corr_val = []
     max_corr_swi = []
     max_corr_lag = []
-            
+     
+    swi001 = []
+    swi010 = []
+    swi020 = []
+    swi040 = []
+    swi060 = []
+    swi100 = []
+              
     for i in range(len(gpis)):
-        print i, lons[i], lats[i]
-        corr_df = corr(paths, corr_df, start_date, end_date, lon=lons[i], 
-                       lat=lats[i], vi_str='NDVI')
-        print corr_df
-        #max_rho = max_corr(corr_df, max_rho)
-         
-        max_corr_val.append(corr_df.max(axis=0).max())
-        max_corr_swi.append(corr_df.max(axis=0).idxmax())
-        max_corr_lag.append(corr_df.max(axis=1).idxmax())
-     
-    max_corr_val = np.array(max_corr_val)
-    max_corr_swi = np.array(max_corr_swi)
-    max_corr_lag = np.array(max_corr_lag)
-     
+        print i
+        lon2 = 75.560811
+        lat2 = 20.275159
+        corr_df = corr(paths, corr_df, start_date, end_date, 
+                       #lon=lons[i], lat=lats[i],
+                       lon=lon2, lat=lat2, 
+                       vi_str='NDVI', time_lags=time_lags)
+        
     #===========================================================================
-    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_val.npy', 
+    #     #print corr_df
+    #     #max_rho = max_corr(corr_df, max_rho)
+    #     corr_rho = corr_df[['NDVI_SWI_001_rho', 'NDVI_SWI_010_rho',
+    #                         'NDVI_SWI_020_rho', 'NDVI_SWI_040_rho',
+    #                         'NDVI_SWI_060_rho', 'NDVI_SWI_100_rho']]
+    #     max_corr_val.append(corr_rho.max(axis=0).max())
+    #     max_corr_swi.append(corr_rho.max(axis=0).idxmax())
+    #     max_corr_lag.append(corr_rho.max(axis=1).idxmax())
+    #   
+    # max_corr_val = np.array(max_corr_val)
+    # max_corr_swi = np.array(max_corr_swi)
+    # max_corr_lag = np.array(max_corr_lag)
+    #   
+    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_val_0.npy', 
     #         max_corr_val)
-    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_swi.npy', 
+    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_swi_0.npy', 
     #         max_corr_swi)
-    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag.npy', 
+    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag_0.npy', 
     #         max_corr_lag)
+    # 
     #===========================================================================
-    
     #print max_rho
     #np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_rho_2007_2015.npy', 
     #        max_rho)
 
     #===========================================================================
     # max_rho = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_rho_2007_2015.npy').item()
-    #    
+    #     
     # # read LC 300m
     # #lc = read_LC(lcpath, 14.7, 29.4, 68, 81.8)
-    #    
+    #     
     # lccs_masked = LC_mask(lons, lats, search_rad=80000)
     # #scatterplot(lons, lats,lccs_masked, s=75, title='ESA CCI land cover classes, 0.4 deg.')
-    #        
+    #         
     # max_rho_masked = {}
     # for key in max_rho:
     #     max_rho_masked[key] = np.ma.array(max_rho[key], mask=lccs_masked.mask)
-    #         
+    #          
     # # plot maps showing time lag with highest rho
     # plot_rho(max_rho_masked, lons, lats)
     #===========================================================================

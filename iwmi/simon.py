@@ -2,8 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from readers import read_img, read_ts, find_nearest, read_WARP_dataset
-from data_readers import read_imgg, read_tss
+from readers import read_img, read_ts, find_nearest
 from netCDF4 import Dataset, num2date
 from mpl_toolkits.basemap import Basemap
 import fnmatch
@@ -18,7 +17,6 @@ def init_0_1_grid(str):
     -----------
     str : str
         NDVI, SWI - which grid is needed
-
     Returns:
     --------
     gird : BasicGrid
@@ -50,10 +48,8 @@ def init_0_1_grid(str):
 
 def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
     '''
-
     Reads all pixel of given area and returns the mean value per day
     for this area.
-
     Parameters:
     -----------
     path : str
@@ -64,7 +60,6 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
         Bounding box coordinates, area to be read
     t : int, optional
         T-value of SWI, default=1
-
     Returns:
     --------
     data : pd.DataFrame
@@ -86,7 +81,7 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
     dates = []
     for day in all_dates:
         data = read_img(path, param=param, lat_min=lat_min, lat_max=lat_max,
-                        lon_min=lon_min, lon_max=lon_max, timestamp=day)
+                              lon_min=lon_min, lon_max=lon_max, timestamp=day)
         if np.ma.is_masked(data):
             mean_value = data.data[np.where(data.data != 255)].mean()
         else:
@@ -114,12 +109,10 @@ def anomaly(df):
     '''
     Calculates anomalies for time series. Of each day mean value of
     this day over all years is subtracted.
-
     Parameters:
     -----------
     df : pd.DataFrame
         DataFrame
-
     Returns:
     --------
     data : pd.DataFrame
@@ -310,7 +303,6 @@ def read_img_new(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
         Timestamp of image, default: 01/01/2014
     plot_img : bool, optional
         If true, result image is plotted, default: False
-
     Returns:
     --------
     data : dict
@@ -447,37 +439,63 @@ def read_poets_nc_img(poets_path, date, lat_min, lat_max, lon_min, lon_max):
     return ndvi, gps, lon_data, lat_data
 
 
+def create_drought_dist(lat_min, lat_max, lon_min, lon_max):
+
+    path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\IDSI_stack.nc'
+    with Dataset(path, "r") as ncfile:
+        unit_temps = ncfile.variables['time'].units
+        nctime = ncfile.variables['time'][:]
+        try:
+            cal_temps = ncfile.variables['time'].calendar
+        except AttributeError:  # Attribute doesn't exist
+            cal_temps = u"gregorian"  # or standard
+
+        all_dates = num2date(nctime, units=unit_temps, calendar=cal_temps)
+    columns = ['healthy', 'watch', 'drought']
+    df = pd.DataFrame([], index=[-999], columns=columns)
+    for date in all_dates:
+        data = read_img(path, 'IDSI', lat_min, lat_max, lon_min, lon_max, timestamp=date)
+        drought = np.where((data[0] == 1) | (data[0] == 2) | (data[0] == 3))[0].size
+        watch = np.where((data[0] == 4) | (data[0] == 5))[0].size
+        healthy = np.where((data[0] == 6) | (data[0] == 7))[0].size
+
+        mean = pd.DataFrame([(healthy, watch, drought)], index=[date], columns=df.columns)
+        df = df.append(mean)
+    df = df[df.index != -999]
+    df.index = all_dates
+    df = df.divide(df.sum(axis=1), axis=0)
+    #df.plot.area(alpha=0.5, ylim=(0, 1))
+
+    return df
+
+def plot_Droughts_and_Anomalies(lat_min, lat_max, lon_min, lon_max):
+
+    df = create_drought_dist(lat_min, lat_max, lon_min, lon_max)
+    df_swi = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc', 'SWI_020',
+                          lat_min, lat_max, lon_min, lon_max)
+    anomaly_swi = anomaly(df_swi)
+
+    df_anom = anomaly_swi.loc[:'20150626'] / 100
+    df_swi = df_swi.loc[:'20150626'] / 100
+    df.drought = df.drought * (-1)
+
+    ax = df.plot.area(alpha=0.4, figsize=[25, 10], color='gyr')
+    df_anom.plot.area(ax=ax, stacked=False, color='b')
+    df_swi.plot(ax=ax, color='b')
+    plt.title('Drought Events in Maharashtra vs. Soil Water Index')
+    plt.grid()
+    plt.axhline(0, color='black')
+    plt.ylim([-1, 1])
+    plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\IDSI_SWI020_Comparison2.png',
+                dpi=450, bbox_inches='tight', pad_inches=0.3)
+
 if __name__ == '__main__':
 
+    df = plot_Droughts_and_Anomalies(19.204, 21, 74, 76.5754)
 
-    vci = read_ts("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_VCI.nc",
-            'VCI_dataset', 76.311035156, 20.014645445, start_date=datetime(2007, 7, 1), end_date=datetime(2013, 5, 31))
-    swi = read_ts("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc", 'SWI_020',
-                  76.311035156, 20.014645445, start_date=datetime(2007, 7, 1), end_date=datetime(2013, 5, 31))
-    img1 = read_img("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_VCI.nc",
-            'VCI_dataset', 14.7148, 29.3655, 68.15, 81.8419, timestamp=datetime(2010, 7, 1))
-    img2 = read_img("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_VCI.nc",
-            'VCI_dataset', 19.204, 21.74, 74, 76.5754, timestamp=datetime(2010, 7, 1))
-
-    #calc_monthly_mean('LAI')
-    #print 'finish LAI'
-    #calc_monthly_mean('NDVI')
-    #print 'finish NDVI'
-    #calc_monthly_mean("SWI")
-    #print 'finish SWI'
-
-    #plot_ts_anomalies(19.204, 21, 74, 76.5754)
-    #swi = read_ts_area("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc", 'SWI',
-    #                   18.552532366, 21.105000275, 74.619140625, 77.420654297, t=20)
-    # swi = read_ts("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\LAI_stack.nc",
-    #               param='LAI', lon=76.05, lat=29.35, start_date=datetime(2007, 7, 1),
-    #               end_date=datetime(2013, 5, 31))
-    # swi.plot()
-    #plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\swi20_smallarea.png')
-
-
+    d=1
     # gg=init_0_1_grid('NDVI')
-    grid = init_0_1_grid('SWI')
+    # grid = init_0_1_grid('SWI')
     # star_date = datetime(2007, 1, 1)
     # end_date = datetime(2014, 5, 13)
     # ndvi = read_poets_nc("C:\Users\s.hochstoger\Desktop\poets\DATA\West_SA_0.1_dekad.nc",
@@ -491,54 +509,54 @@ if __name__ == '__main__':
 
 
     #=============== map SWI anomalies for study area
-    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\"
-    years = [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015]
-    months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    days = [3, 13, 23]
-    all_means = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_SWI_040.csv')
-    all_means.index = all_means.iloc[:, 0].values
-    all_means = all_means.drop('Unnamed: 0', 1)
-
-    for year in years:
-        for month in months:
-
-            data1, gp1, lon1, lat1 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
-                                              timestamp=datetime(year, month, days[0]), swi='SWI_040')
-            data2, gp2, lon2, lat2 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
-                                              timestamp=datetime(year, month, days[1]), swi='SWI_040')
-            data3, gp3, lon3, lat3 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
-                                              timestamp=datetime(year, month, days[2]), swi='SWI_040')
-            array_all = np.ma.vstack(data1, data2, data3)
-            mean = np.ma.mean(array_all, axis=0)
-            df = pd.DataFrame(mean.data.flatten(), index=gp1, columns=[str(month)])
-            df.iloc[np.where(df == 0)[0]] = np.NAN
-
-            anom = df-all_means
-            anom = anom.dropna(axis=0, how='all')
-            anom = anom.dropna(axis=1, how='all')
-
-            grid = init_0_1_grid('SWI')
-            lon_anom = []
-            lat_anom = []
-            for gp in anom.index.values:
-                lon, lat = grid.gpi2lonlat(gp)
-                lon_anom.append(lon)
-                lat_anom.append(lat)
-
-            plt.figure(figsize=(20, 15))
-            map = Basemap(projection='cyl', llcrnrlon=68.14, llcrnrlat=14.71, urcrnrlat=29.37,
-                          urcrnrlon=81.85)
-            map.drawmapboundary()
-            map.drawcoastlines()
-            map.drawcountries()
-            #map.readshapefile("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\IND_adm1\\IND_adm1", 'IND_adm1')
-            cm = plt.cm.get_cmap('RdYlBu')
-            map.scatter(np.array(lon_anom).flatten(), np.array(lat_anom).flatten(), c=np.array(anom).flatten(),
-                        edgecolor='None', marker='s', s=75, vmin=-30, vmax=30, cmap=cm)
-            plt.colorbar()
-            plt.title('SWI Anomalies ' + str(year) + '_' + str(month).zfill(2) + ' T = 40', fontsize=21)
-            plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\' + str(year) + '_' + str(month).zfill(2) + '_anomalies_T40.png',
-                        dpi=450, bbox_inches='tight', pad_inches=0.3)
+    # swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\"
+    # years = [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015]
+    # months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    # days = [3, 13, 23]
+    # all_means = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_SWI_040.csv')
+    # all_means.index = all_means.iloc[:, 0].values
+    # all_means = all_means.drop('Unnamed: 0', 1)
+    #
+    # for year in years:
+    #     for month in months:
+    #
+    #         data1, gp1, lon1, lat1 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
+    #                                           timestamp=datetime(year, month, days[0]), swi='SWI_040')
+    #         data2, gp2, lon2, lat2 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
+    #                                           timestamp=datetime(year, month, days[1]), swi='SWI_040')
+    #         data3, gp3, lon3, lat3 = read_img_new(swi_path, 'SWI', 14.7148, 29.3655, 68.15, 81.8419,
+    #                                           timestamp=datetime(year, month, days[2]), swi='SWI_040')
+    #         array_all = np.ma.vstack(data1, data2, data3)
+    #         mean = np.ma.mean(array_all, axis=0)
+    #         df = pd.DataFrame(mean.data.flatten(), index=gp1, columns=[str(month)])
+    #         df.iloc[np.where(df == 0)[0]] = np.NAN
+    #
+    #         anom = df-all_means
+    #         anom = anom.dropna(axis=0, how='all')
+    #         anom = anom.dropna(axis=1, how='all')
+    #
+    #         grid = init_0_1_grid('SWI')
+    #         lon_anom = []
+    #         lat_anom = []
+    #         for gp in anom.index.values:
+    #             lon, lat = grid.gpi2lonlat(gp)
+    #             lon_anom.append(lon)
+    #             lat_anom.append(lat)
+    #
+    #         plt.figure(figsize=(20, 15))
+    #         map = Basemap(projection='cyl', llcrnrlon=68.14, llcrnrlat=14.71, urcrnrlat=29.37,
+    #                       urcrnrlon=81.85)
+    #         map.drawmapboundary()
+    #         map.drawcoastlines()
+    #         map.drawcountries()
+    #         #map.readshapefile("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\IND_adm1\\IND_adm1", 'IND_adm1')
+    #         cm = plt.cm.get_cmap('RdYlBu')
+    #         map.scatter(np.array(lon_anom).flatten(), np.array(lat_anom).flatten(), c=np.array(anom).flatten(),
+    #                     edgecolor='None', marker='s', s=75, vmin=-30, vmax=30, cmap=cm)
+    #         plt.colorbar()
+    #         plt.title('SWI Anomalies ' + str(year) + '_' + str(month).zfill(2) + ' T = 40', fontsize=21)
+    #         plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\' + str(year) + '_' + str(month).zfill(2) + '_anomalies_T40.png',
+    #                     dpi=450, bbox_inches='tight', pad_inches=0.3)
     #=========================================
 
     # #=============== map NDVI anomalies for study area
@@ -593,6 +611,5 @@ if __name__ == '__main__':
     #                     + str(year) + '_' + str(month).zfill(2) + '_anomalies.png', dpi=450,
     #                     bbox_inches='tight', pad_inches=0.3)
     #=========================================
-
 
     pass
