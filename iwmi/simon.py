@@ -75,32 +75,42 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
 
         all_dates = num2date(nctime, units=unit_temps, calendar=cal_temps)
 
-    if param == 'SWI':
-        param = 'SWI_' + str(t).zfill(3)
-    mean = []
-    dates = []
-    for day in all_dates:
-        data = read_img(path, param=param, lat_min=lat_min, lat_max=lat_max,
-                              lon_min=lon_min, lon_max=lon_max, timestamp=day)
-        if np.ma.is_masked(data):
-            mean_value = data.data[np.where(data.data != 255)].mean()
-        else:
-            mean_value = data.mean()
-        mean.append(mean_value)
-        dates.append(day)
-        # if day.day == 24:
-        #     dates.append(day.replace(day=23))
-        # elif day.day == 22:
-        #     dates.append(day.replace(day=23))
-        # elif day.day == 21:
-        #     dates.append(day.replace(day=23))
-        # else:
-        #     dates.append(day)
+        lons = ncfile.variables['lon'][:]
+        lats = ncfile.variables['lat'][:]
+        if param == 'SWI':
+            param = 'SWI_' + str(t).zfill(3)
+        mean = []
+        dates = []
+        for day in all_dates:
+            nearest_date = find_nearest(all_dates, day)
+            date_idx = np.where(all_dates == nearest_date)[0]
 
-    data_df = {param: mean}
-    df = pd.DataFrame(data=data_df, index=dates)
-    if df.columns == 'SWI':
-        df.columns = [param]
+            lons = ncfile.variables['lon'][:]
+            lats = ncfile.variables['lat'][:]
+            lat_idx = np.where((lats >= lat_min) & (lats <= lat_max))[0]
+            lon_idx = np.where((lons >= lon_min) & (lons <= lon_max))[0]
+            data = ncfile.variables[param][date_idx, lat_idx, lon_idx]
+            data[data < 0] = 0
+
+            if np.ma.is_masked(data):
+                mean_value = data.data[np.where(data.data != 255)].mean()
+            else:
+                mean_value = data.mean()
+            mean.append(mean_value)
+            dates.append(day)
+            # if day.day == 24:
+            #     dates.append(day.replace(day=23))
+            # elif day.day == 22:
+            #     dates.append(day.replace(day=23))
+            # elif day.day == 21:
+            #     dates.append(day.replace(day=23))
+            # else:
+            #     dates.append(day)
+
+        data_df = {param: mean}
+        df = pd.DataFrame(data=data_df, index=dates)
+        if df.columns == 'SWI':
+            df.columns = [param]
 
     return df
 
@@ -211,16 +221,16 @@ def calc_monthly_mean(param):
     grid = init_0_1_grid(param)
     gps = grid.get_bbox_grid_points(14.7148, 29.3655, 68.15, 81.8419)
     if param == 'NDVI':
-        path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_NDVI.nc'
+        path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\West_SA_0.1_dekad_NDVI.nc'
         means = _get_monthly_mean(path, param, grid, gps, t=None)
         means.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_NDVI.csv")
     elif param == "LAI":
-        path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\West_SA_0.1_dekad_LAI.nc'
+        path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\West_SA_0.1_dekad_LAI.nc'
         means = _get_monthly_mean(path, param, grid, gps, t=None)
         means.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_LAI.csv")
     elif param == 'SWI':
         t = [1, 5, 10, 15, 20, 40, 60, 100]
-        path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc"
+        path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc"
         for tt in t:
             means = _get_monthly_mean(path, param, grid, gps, t=tt)
             means.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\monthly_mean_SWI_" + str(tt).zfill(3) + ".csv")
@@ -245,7 +255,7 @@ def _get_monthly_mean(path, param, grid, gpi, t=None):
     size = gpi.size
     for gp in gpi:
         lon, lat = grid.gpi2lonlat(gp)
-        ts = read_ts(path, param=param, lon=lon, lat=lat, start_date=startdate,
+        ts = read_ts(path, params=param, lon=lon, lat=lat, start_date=startdate,
                      end_date=enddate)
         ts[(ts == -99) | (ts == 255)] = np.NaN
         monthly = ts.resample('M').mean()
@@ -441,7 +451,8 @@ def read_poets_nc_img(poets_path, date, lat_min, lat_max, lon_min, lon_max):
 
 def create_drought_dist(lat_min, lat_max, lon_min, lon_max):
 
-    path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\IDSI_stack.nc'
+    path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\IDSI_stack.nc'
+
     with Dataset(path, "r") as ncfile:
         unit_temps = ncfile.variables['time'].units
         nctime = ncfile.variables['time'][:]
@@ -466,12 +477,18 @@ def create_drought_dist(lat_min, lat_max, lon_min, lon_max):
     df = df.divide(df.sum(axis=1), axis=0)
     #df.plot.area(alpha=0.5, ylim=(0, 1))
 
+    int_steps = np.arange(43, 367, 46)
+    for steps in int_steps:
+        step_to = steps+6
+        df.iloc[steps:step_to] = np.NAN
+    df = df.interpolate('linear')
+
     return df
 
 def plot_Droughts_and_Anomalies(lat_min, lat_max, lon_min, lon_max):
 
     df = create_drought_dist(lat_min, lat_max, lon_min, lon_max)
-    df_swi = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc', 'SWI_020',
+    df_swi = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc', 'SWI_010',
                           lat_min, lat_max, lon_min, lon_max)
     anomaly_swi = anomaly(df_swi)
 
@@ -486,12 +503,29 @@ def plot_Droughts_and_Anomalies(lat_min, lat_max, lon_min, lon_max):
     plt.grid()
     plt.axhline(0, color='black')
     plt.ylim([-1, 1])
-    plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\IDSI_SWI020_Comparison2.png',
+    plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\IDSI_SWI010_Comparison_interpolate.png',
                 dpi=450, bbox_inches='tight', pad_inches=0.3)
 
 if __name__ == '__main__':
+    #calc_monthly_mean('SWI')
+    #ccits = read_ts('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\CCI_stack.nc', 'sm',
+    #                75, 20, start_date=datetime(1978, 11, 1), end_date=datetime(2014, 12, 1))
+    #cci = ccits[ccits != 255]
+    #cci = cci.dropna(axis=0)
 
-    df = plot_Droughts_and_Anomalies(19.204, 21, 74, 76.5754)
+    #cci = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\CCI_stack.nc', 'sm',
+    #                  19.204, 21, 74, 76.5754)
+    #df = plot_Droughts_and_Anomalies(19.204, 21, 74, 76.5754)
+    rf = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\TRMM_RF_stack.nc', 'TRMM_RF',
+                      19.204, 21, 74, 76.5754)
+    rf_10d = rf.resample('10d').mean()
+    rf_m = rf.resample('M').mean()
+
+    anom1 = anomaly(rf)
+    anom2 = anomaly(rf_m)
+
+    test = read_img('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\TRMM_RF_stack.nc', 'TRMM_RF',
+                    14.7148, 29.3655, 68.15, 81.8419, timestamp=datetime(2013, 2, 2))
 
     d=1
     # gg=init_0_1_grid('NDVI')
