@@ -9,19 +9,15 @@ from poets.shape.shapes import Shape
 
 from readers import read_ts, read_img
 from data_analysis import rescale_peng
-from Basemap_scatterplot import scatterplot
+from Basemap_scatterplot import scatter_subplots
 
 
-def validate_prediction():
-    
-    pred = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results.npy')
+def validate_prediction(pred):
+
     lons = pred[:,0]
     lats = pred[:,1]
     data = pred[:,2]
     timestamp = np.unique(pred[:,3])[0]
-    data_resc = rescale_peng(data, min(data), max(data))
-    scatterplot(lons, lats, data_resc, s=200, title=str(timestamp)+' - simulated', 
-                discrete=False, vmin=0, vmax=100)
     
     # districts
     shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Documents', 
@@ -37,15 +33,16 @@ def validate_prediction():
                                                   lat_min=lat_min, lat_max=lat_max,
                                                   lon_min=lon_min, lon_max=lon_max, 
                                                   timestamp=vi_ts)
-    
-    vi_resc = rescale_peng(vi_data.flatten(), np.nanmin(vi_data.flatten()), 
-                           np.nanmax(vi_data.flatten()))
+    vi_data = vi_data*100/250
+
     vi_lon, vi_lat = np.meshgrid(vi_lons, vi_lats)
     vi_lon = vi_lon.flatten()
     vi_lat = vi_lat.flatten()
     
-    scatterplot(vi_lon, vi_lat, vi_resc, s=200, title=str(vi_date)+' - orig. data', 
-                discrete=False, vmin=0, vmax=100)
+    scatter_subplots(lons, lats, data, 200, 
+                     vi_lon, vi_lat, vi_data, 200, 
+                     title1=str(vi_date)+' - simulated',
+                     title2=str(vi_date)+' - orig. data')
     
     return pred
 
@@ -70,6 +67,8 @@ def start_district_pred(paths, region, pred_date, vi_str='NDVI_dataset',
     end_date = datetime(2015,7,1)
     
     results = []
+    results2 = []
+    results3 = []
     for lon in lons:
         for lat in lats:
             print lon, lat
@@ -80,12 +79,16 @@ def start_district_pred(paths, region, pred_date, vi_str='NDVI_dataset',
             swi_list = [t_val]
             swi_df = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
                              start_date=start_date, end_date=end_date)
+            # read vi and scale from 0 to 100 (before 0 to 250)
             vi_all = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
                          start_date=start_date, end_date=end_date)
             vi_all[vi_str][np.where(vi_all==-99)[0]] = np.NaN
+            vi_all = vi_all*100/250
             
             vi = vi_all[:pred_date]
-            vi = rescale_peng(vi, np.nanmin(vi), np.nanmax(vi))
+            vi_min = np.nanmin(vi)
+            vi_max = np.nanmax(vi)
+            vi = rescale_peng(vi, vi_min, vi_max)
             
             swi_all = swi_df[t_val]
             swi = swi_all[:pred_date]
@@ -102,11 +105,14 @@ def start_district_pred(paths, region, pred_date, vi_str='NDVI_dataset',
             matched_data = temp_match.matching(swi, vi)
             
             kd = zribi_kd(swi, vi, matched_data)
-            results = zribi_sim(lon, lat, swi, vi, matched_data, kd, 
-                                results=results)
+            results, results2, results3 = zribi_sim(lon, lat, swi, vi, 
+                                                    matched_data, kd, vi_min, vi_max,
+                                                    results=results, results2=results2,
+                                                    results3=results3)
         
-    np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results.npy', 
-             results)
+    np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results.npy', results)
+    np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results2.npy', results2)
+    np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results3.npy', results3)
 
 
 def zribi_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI', 
@@ -170,8 +176,9 @@ def zribi_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI',
     return kd
             
       
-def zribi_sim(lon, lat, swi, vi, matched_data, kd, t_val='SWI_040', 
-              vi_str='NDVI_dataset', plot_fig=False, monthly=False, results=[]):
+def zribi_sim(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max, 
+              t_val='SWI_040', vi_str='NDVI_dataset', plot_fig=False, 
+              monthly=False, results=[], results2=[], results3=[]):
     
     vi_sim = []
     for i in range(0,len(matched_data)):
@@ -234,7 +241,18 @@ def zribi_sim(lon, lat, swi, vi, matched_data, kd, t_val='SWI_040',
         
         df_sim = pd.DataFrame(vi_sim, columns=[vi_str+'_sim'], index=new_idx)
     
-    results.append([lon, lat, vi_sim[-1], new_idx[-1]])
+    idx2 = np.where(new_idx == datetime(2008,12,21))[0]
+    idx3 = np.where(new_idx == datetime(2013,12,21))[0]
+    
+    # scale back
+    vi = vi[vi_str]
+    res = vi_sim[-1]*(vi_max - vi_min)/100 + vi_min
+    res2 = vi_sim[idx2]*(vi_max - vi_min)/100 + vi_min
+    res3 = vi_sim[idx3]*(vi_max - vi_min)/100 + vi_min  
+    
+    results2.append([lon, lat, res2, new_idx[idx2]])
+    results3.append([lon, lat, res3, new_idx[idx3]])
+    results.append([lon, lat, res, new_idx[-1]])
     
     #===========================================================================
     # ax=matched_data[t_val].plot()
@@ -245,10 +263,9 @@ def zribi_sim(lon, lat, swi, vi, matched_data, kd, t_val='SWI_040',
     # plt.show()
     # #plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+str(lon)+
     # #            '_'+str(lat)+'.png', bbox_inches='tight')
-    #  
-    # print df_sim
     #===========================================================================
-    return results
+
+    return results, results2, results3
 
 
 if __name__ == '__main__':
@@ -268,6 +285,15 @@ if __name__ == '__main__':
              'FAPAR': fapar_path}
     
     region = 'IN.MH.JN'
-    pred_date = datetime(2012,4,1)
-    #start_district_pred(paths, region, pred_date)    
-    validate_prediction()
+    pred_date = datetime(2014,5,1)
+    start_district_pred(paths, region, pred_date) 
+    
+    calib = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results2.npy')   
+    validate_prediction(calib)
+    
+    valid = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results3.npy')   
+    validate_prediction(valid)
+    
+    pred = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results.npy')   
+    validate_prediction(pred)
+    
