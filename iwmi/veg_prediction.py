@@ -241,17 +241,24 @@ def zribi_sim(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
         
         df_sim = pd.DataFrame(vi_sim, columns=[vi_str+'_sim'], index=new_idx)
     
-    idx2 = np.where(new_idx == datetime(2008,12,21))[0]
-    idx3 = np.where(new_idx == datetime(2013,12,21))[0]
+    idx2 = np.where(new_idx == datetime(2008,5,21))[0]
+    idx3 = np.where(new_idx == datetime(2013,5,21))[0]
     
-    # scale back
+    # scale back and consider data gaps
     vi = vi[vi_str]
-    res = vi_sim[-1]*(vi_max - vi_min)/100 + vi_min
-    res2 = vi_sim[idx2]*(vi_max - vi_min)/100 + vi_min
-    res3 = vi_sim[idx3]*(vi_max - vi_min)/100 + vi_min  
+    if len(idx2) == 0:
+        pass
+    else:
+        res2 = vi_sim[idx2]*(vi_max - vi_min)/100 + vi_min
+        results2.append([lon, lat, res2, new_idx[idx2]])
     
-    results2.append([lon, lat, res2, new_idx[idx2]])
-    results3.append([lon, lat, res3, new_idx[idx3]])
+    if len(idx3) == 0:
+        pass
+    else:
+        res3 = vi_sim[idx3]*(vi_max - vi_min)/100 + vi_min  
+        results3.append([lon, lat, res3, new_idx[idx3]])
+    
+    res = vi_sim[-1]*(vi_max - vi_min)/100 + vi_min
     results.append([lon, lat, res, new_idx[-1]])
     
     #===========================================================================
