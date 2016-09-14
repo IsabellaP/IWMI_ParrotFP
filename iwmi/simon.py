@@ -2,8 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from readers import read_img, read_ts, find_nearest, read_WARP_dataset
-from data_readers import read_imgg, read_tss
+from readers import read_img, read_ts, find_nearest
 from netCDF4 import Dataset, num2date
 from mpl_toolkits.basemap import Basemap
 import fnmatch
@@ -18,7 +17,6 @@ def init_0_1_grid(str):
     -----------
     str : str
         NDVI, SWI - which grid is needed
-
     Returns:
     --------
     gird : BasicGrid
@@ -50,10 +48,8 @@ def init_0_1_grid(str):
 
 def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
     '''
-
     Reads all pixel of given area and returns the mean value per day
     for this area.
-
     Parameters:
     -----------
     path : str
@@ -64,7 +60,6 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
         Bounding box coordinates, area to be read
     t : int, optional
         T-value of SWI, default=1
-
     Returns:
     --------
     data : pd.DataFrame
@@ -79,6 +74,7 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
             cal_temps = u"gregorian"  # or standard
 
         all_dates = num2date(nctime, units=unit_temps, calendar=cal_temps)
+
         lons = ncfile.variables['lon'][:]
         lats = ncfile.variables['lat'][:]
         if param == 'SWI':
@@ -123,12 +119,10 @@ def anomaly(df):
     '''
     Calculates anomalies for time series. Of each day mean value of
     this day over all years is subtracted.
-
     Parameters:
     -----------
     df : pd.DataFrame
         DataFrame
-
     Returns:
     --------
     data : pd.DataFrame
@@ -319,7 +313,6 @@ def read_img_new(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
         Timestamp of image, default: 01/01/2014
     plot_img : bool, optional
         If true, result image is plotted, default: False
-
     Returns:
     --------
     data : dict
@@ -459,6 +452,7 @@ def read_poets_nc_img(poets_path, date, lat_min, lat_max, lon_min, lon_max):
 def create_drought_dist(lat_min, lat_max, lon_min, lon_max):
 
     path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\IDSI_stack.nc'
+
     with Dataset(path, "r") as ncfile:
         unit_temps = ncfile.variables['time'].units
         nctime = ncfile.variables['time'][:]
@@ -532,7 +526,6 @@ if __name__ == '__main__':
 
     test = read_img('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\TRMM_RF_stack.nc', 'TRMM_RF',
                     14.7148, 29.3655, 68.15, 81.8419, timestamp=datetime(2013, 2, 2))
-
 
     d=1
     # gg=init_0_1_grid('NDVI')
