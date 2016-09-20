@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import pytesmo.temporal_matching as temp_match
 from poets.shape.shapes import Shape
 
-from readers import read_ts, read_img
+from readers import read_ts, read_img, find_nearest
 from data_analysis import rescale_peng
-from Basemap_scatterplot import scatter_subplots
+from Basemap_scatterplot import scatter_subplots, scatterplot
 
 
 def validate_prediction(pred):
@@ -27,13 +27,12 @@ def validate_prediction(pred):
     shpfile = Shape(region, shapefile=shapefile)
     lon_min, lat_min, lon_max, lat_max = shpfile.bbox
     
-    vi_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA2\\NDVI01\\West_SA_0.1_dekad.nc"
+    vi_path = "E:\\poets\\RAWDATA\\NDVI\\NDVI_gapfree.nc"
     vi_ts = datetime(timestamp.year, timestamp.month, timestamp.day)
-    vi_data, vi_lons, vi_lats, vi_date = read_img(vi_path, param='NDVI_dataset', 
+    vi_data, vi_lons, vi_lats, vi_date = read_img(vi_path, param='NDVI', 
                                                   lat_min=lat_min, lat_max=lat_max,
                                                   lon_min=lon_min, lon_max=lon_max, 
                                                   timestamp=vi_ts)
-    vi_data = vi_data*100/250
 
     vi_lon, vi_lat = np.meshgrid(vi_lons, vi_lats)
     vi_lon = vi_lon.flatten()
@@ -46,12 +45,30 @@ def validate_prediction(pred):
     
     return pred
 
-def start_district_pred(paths, region, pred_date, vi_str='NDVI_dataset', 
-                        t_val='SWI_040', monthly=False):
+def start_pred(paths, region, pred_date, vi_str='NDVI', 
+                        t_val='SWI_040', monthly=False, spatial_res=0.1):
     
-    with Dataset(paths['SWI'], 'r') as ncfile:
-        swi_lons = ncfile.variables['lon'][:]
-        swi_lats = ncfile.variables['lat'][:]
+    if spatial_res == 0.1:
+        with Dataset(paths['SWI'], 'r') as ncfile:
+            res_lons = ncfile.variables['lon'][:]
+            res_lats = ncfile.variables['lat'][:]
+    elif spatial_res == 500:
+        with Dataset(paths['NDVI'], 'r') as ncfile:
+            res_lons = ncfile.variables['lon'][:]
+            res_lats = ncfile.variables['lat'][:]
+    
+    with Dataset(paths['lc']) as ncfile:
+        lccs = ncfile.variables['lccs_class'][:]
+        lc_lons = ncfile.variables['lon'][:]
+        lc_lats = ncfile.variables['lat'][:]
+    
+    #===========================================================================
+    # # achtung pc haengt sich eine zeit lang auf
+    # lc_lons, lc_lats = np.meshgrid(lc_lons, lc_lats)
+    # lc_lons = lc_lons.flatten()
+    # lc_lats = lc_lats.flatten()
+    # scatterplot(lc_lons, lc_lats, lccs, discrete=False, vmin=-128, vmax=128)
+    #===========================================================================
     
     # districts
     shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Documents', 
@@ -60,8 +77,8 @@ def start_district_pred(paths, region, pred_date, vi_str='NDVI_dataset',
     
     shpfile = Shape(region, shapefile=shapefile)
     lon_min, lat_min, lon_max, lat_max = shpfile.bbox
-    lons = swi_lons[np.where((swi_lons>=lon_min) & (swi_lons<=lon_max))]
-    lats = swi_lats[np.where((swi_lats>=lat_min) & (swi_lats<=lat_max))]
+    lons = res_lons[np.where((res_lons>=lon_min) & (res_lons<=lon_max))]
+    lats = res_lats[np.where((res_lats>=lat_min) & (res_lats<=lat_max))]
     
     start_date = datetime(2007,7,1)
     end_date = datetime(2015,7,1)
@@ -72,6 +89,17 @@ def start_district_pred(paths, region, pred_date, vi_str='NDVI_dataset',
     for lon in lons:
         for lat in lats:
             print lon, lat
+            if round(lon,2) == 76.35 and round(lat,2) == 19.55:
+                print 'danger'
+            
+            nearest_lon = find_nearest(lc_lons, lon)
+            nearest_lat = find_nearest(lc_lats, lat)
+            lc = lccs[nearest_lat, nearest_lon]
+            
+            if (lc == -66) or (lc == -46) or (lc == -36) or (lc == 0):
+                # urban | water | snow and ice | no data
+                print 'lc mask'
+                continue
                 
             swi_path = paths['SWI']
             vi_path = paths[vi_str]
@@ -82,8 +110,8 @@ def start_district_pred(paths, region, pred_date, vi_str='NDVI_dataset',
             # read vi and scale from 0 to 100 (before 0 to 250)
             vi_all = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
                          start_date=start_date, end_date=end_date)
-            vi_all[vi_str][np.where(vi_all==-99)[0]] = np.NaN
-            vi_all = vi_all*100/250
+            #vi_all[vi_str][np.where(vi_all==-99)[0]] = np.NaN
+            #vi_all = vi_all*100/250
             
             vi = vi_all[:pred_date]
             vi_min = np.nanmin(vi)
@@ -177,7 +205,7 @@ def zribi_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI',
             
       
 def zribi_sim(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max, 
-              t_val='SWI_040', vi_str='NDVI_dataset', plot_fig=False, 
+              t_val='SWI_040', vi_str='NDVI', plot_fig=False, 
               monthly=False, results=[], results2=[], results3=[]):
     
     vi_sim = []
@@ -229,6 +257,8 @@ def zribi_sim(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
     else:
         # vi_sim is shifted 1 dekade comapred to matched_data
         new_idx = matched_data.index[1:]
+        if len(new_idx) == 0:
+            return results, results2, results3
         if new_idx[-1].day == 21:
             if new_idx[-1].month == 12:
                 new_idx = new_idx.append(pd.Index([datetime(new_idx[-1].year+1, 
@@ -241,7 +271,7 @@ def zribi_sim(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
         
         df_sim = pd.DataFrame(vi_sim, columns=[vi_str+'_sim'], index=new_idx)
     
-    idx2 = np.where(new_idx == datetime(2008,5,21))[0]
+    idx2 = np.where(new_idx == datetime(2012,5,21))[0]
     idx3 = np.where(new_idx == datetime(2013,5,21))[0]
     
     # scale back and consider data gaps
@@ -279,25 +309,27 @@ if __name__ == '__main__':
     
     # set paths to datasets
     ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
-    lcpath = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA2\\LC\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-20100101-West_SA-v1.6.1.nc"
+    lcpath = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\LC\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-20100101-West_SA-v1.6.1.nc"
     ndvi_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA2\\NDVI\\NDVI_stack.nc"
     ndvi01_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA2\\NDVI01\\West_SA_0.1_dekad.nc"
     ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
+    ndvi_gapfree = "E:\\poets\\RAWDATA\\NDVI\\NDVI_gapfree.nc"
     lai_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA2\\LAI\\LAI_stack.nc"
     swi_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA2\\SWI\\SWI_stack.nc"
     fapar_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA2\\FAPAR\\FAPAR_stack.nc"
     
     paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
              'NDVI_dataset': ndvi01_path, 'LAI': lai_path, 'SWI': swi_path, 
-             'FAPAR': fapar_path}
-    
+             'FAPAR': fapar_path, 'NDVI': ndvi_gapfree}
+
     region = 'IN.MH.JN'
     pred_date = datetime(2014,5,1)
-    start_district_pred(paths, region, pred_date) 
+    spatial_res = 500 # possible values: 0.1 (default), 500
+    start_pred(paths, region, pred_date, spatial_res=spatial_res) 
     
     calib = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results2.npy')   
     validate_prediction(calib)
-    
+     
     valid = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results3.npy')   
     validate_prediction(valid)
     
