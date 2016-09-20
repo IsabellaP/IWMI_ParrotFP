@@ -83,7 +83,7 @@ def scatter_subplots(lons1, lats1, data1, s1,
         plt.title(title1)
         
     sc = m.scatter(lons1, lats1, c=data1, edgecolor='None', marker=',', 
-                       s=s1, vmin=0, vmax=100, cmap='RdYlGn')
+                       s=s1, vmin=0, vmax=1, cmap='RdYlGn')
     m.colorbar(sc, 'right', size='5%', pad='2%')
     
     # second subplot
@@ -106,7 +106,7 @@ def scatter_subplots(lons1, lats1, data1, s1,
         plt.title(title2)
         
     sc = m.scatter(lons2, lats2, c=data2, edgecolor='None', marker=',', 
-                       s=s2, vmin=0, vmax=100, cmap='RdYlGn')
+                       s=s2, vmin=0, vmax=1, cmap='RdYlGn')
     m.colorbar(sc, 'right', size='5%', pad='2%')
     
     plt.show()
