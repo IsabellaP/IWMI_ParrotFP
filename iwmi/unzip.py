@@ -5,6 +5,7 @@ import zipfile
 from datetime import datetime, timedelta
 from netCDF4 import Dataset, date2num
 import gdal
+from zipfile import BadZipfile
 
 
 def unzip(path_in, path_out):
@@ -15,7 +16,10 @@ def unzip(path_in, path_out):
     
     for fname in folders:
         zipfile_n = os.listdir(os.path.join(path_in, fname))[1]
-        zip_ref = zipfile.ZipFile(os.path.join(path_in, fname, zipfile_n), 'r')
+        try:
+            zip_ref = zipfile.ZipFile(os.path.join(path_in, fname, zipfile_n), 'r')
+        except BadZipfile:
+            continue
         zip_ref.extractall(path_out)
         zip_ref.close()
         
@@ -238,9 +242,14 @@ def rename_files():
 
 if __name__ == '__main__':
        
-    path = "E:\\poets\\RAWDATA\\NDVI\\"
-    new_path = "E:\\poets\\RAWDATA\\"
-    datestr = {'year': (5,9), 'month': (9,11), 'day': (11,13)} # NDVI gapfree
-    merge_tiff(path, new_path, 'NDVI_stack.nc', 'NDVI', datestr)
+    path = "E:\\_DATA\\SWI_daily\\"
+    new_path = "E:\\_DATA\\"
+    format_path = "E:\\_DATA\\SWI_daily_nc\\"
+    new_ncf = 'SWI_daily_stack.nc'
+    variables = ['SWI_001', 'SWI_005', 'SWI_010', 'SWI_015', 
+                 'SWI_020', 'SWI_040', 'SWI_060', 'SWI_100']  
+    datestr = {'year': [14,18], 'month': [18,20], 'day': [20,22]}
+    
+    merge_nc(format_path, new_path, new_ncf, variables, datestr)
     
     print "done"

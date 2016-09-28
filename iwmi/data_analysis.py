@@ -8,6 +8,7 @@ from Basemap_scatterplot import scatterplot
 import matplotlib.colors as cls
 
 from readers import read_ts, read_img
+from simon import read_ts_area
 
 import pytesmo.scaling as scaling
 import pytesmo.temporal_matching as temp_match
@@ -77,28 +78,32 @@ def corr(paths, corr_df, start_date, end_date, lon=None, lat=None,
     
     # read SWI for different T-values and VI
     swi_list = ['SWI_001', 'SWI_010', 'SWI_020', 'SWI_040', 'SWI_060', 'SWI_100']
-    swi_df = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
-                     start_date=start_date, end_date=end_date)
-    vi = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
-                 start_date=start_date, end_date=end_date)
-    vi[vi_str][np.where(vi==255)[0]] = np.NaN
+    swi_df, nearest_lon, nearest_lat = read_ts(swi_path, lon=lon, 
+                                               lat=lat, params=swi_list, 
+                                               start_date=start_date, 
+                                               end_date=end_date)
+    lat_min = nearest_lat - 0.04
+    lat_max = nearest_lat + 0.04
+    lon_min = nearest_lon - 0.04
+    lon_max = nearest_lon + 0.04
+    vi = read_ts_area(vi_path, vi_str, lat_min, lat_max, lon_min, lon_max, t=1)
+    #vi = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
+    #             start_date=start_date, end_date=end_date)
+    vi[vi_str][np.where(vi<0)[0]] = np.NaN
 
     water = {}
     for swi_key in swi_list:
-        water[swi_key] = swi_df[swi_key] 
-    
-    # rescale VI before further processing using method from Peng et al., 2014
-    for ds_water in water:
-        water[ds_water] = rescale_peng(water[ds_water], 
-                                       np.nanmin(water[ds_water]), 
-                                       np.nanmax(water[ds_water]))
+        # rescale VI before further processing using method from Peng et al., 2014
+        swi_resc = rescale_peng(swi_df[swi_key], swi_df[swi_key].min(),
+                                swi_df[swi_key].max())
+        water[swi_key] = swi_resc
     
     vi_resc = rescale_peng(vi, np.nanmin(vi), np.nanmax(vi))
     
     # insert time lag
     for time_lag in time_lags:
         if time_lag > 0:
-            vi = vi_resc.copy()
+            vi = vi_resc[vi_str].copy()
             vi_idx = vi.index + timedelta(days=time_lag)
             vi = pd.DataFrame(vi.values, columns=[vi_str], index=vi_idx)
     
@@ -282,7 +287,7 @@ def resample_rho_LC(input_data, src_lons, src_lats, target_lons, target_lats,
 
 def LC_mask(lons, lats, search_rad=80000):
     # read landcover classes
-    lccs, lccs_lons, lccs_lats = read_img('C:\\Users\\i.pfeil\\Desktop\\'+
+    lccs, lccs_lons, lccs_lats, _ = read_img('C:\\Users\\i.pfeil\\Desktop\\'+
                                           'poets\\DATA\\West_SA_0.4_monthly_LC.nc',
                                           param='LC_lccs_class', lat_min=14.7, 
                                           lat_max=29.4, lon_min=68, 
@@ -307,40 +312,47 @@ def LC_mask(lons, lats, search_rad=80000):
 
 def plot_max_timelags(lons, lats):
     
-    max_corr_val = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_val.npy')
-    max_corr_swi = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_swi.npy')
-    max_corr_lag = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag.npy')
+    max_corr_val = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_val2.npy')
+    max_corr_swi = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_swi2.npy')
+    max_corr_lag = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag2.npy')
     
     lccs_masked = LC_mask(lons, lats)
     max_corr_val = np.ma.masked_where(lccs_masked.mask, max_corr_val)
     max_corr_swi = np.ma.masked_where(lccs_masked.mask, max_corr_swi)
     max_corr_lag = np.ma.masked_where(lccs_masked.mask, max_corr_lag)
     
-    scatterplot(lons, lats, max_corr_val, s=200, title='Maximum correlation '+
+    scatterplot(lons, lats, max_corr_val, s=150, title='Maximum correlation '+
                 'between SWI and NDVI', marker=',', 
-                discrete=True, binmin=0, binmax=1, bins=20, 
-                ticks=np.linspace(0,1,20))
+                discrete=False, vmin=0, vmax=1)
     
     
-    swi_vals = np.empty_like(max_corr_val)
+    swi_vals = max_corr_val.copy()
      
-    for idx, key in enumerate(np.unique(max_corr_swi)):
+    idx = 0
+    key_list = []
+    for key in np.unique(max_corr_swi):
+        if 'NDVI' not in key:
+            continue
         print idx
-        swi_vals[np.where(max_corr_swi == key)] = idx 
-    scatterplot(lons, lats, swi_vals, s=200, title='SWI dataset showing '+
+        swi_vals[np.where(max_corr_swi == key)] = idx
+        key_list.append(key)
+        idx += 1
+    swi_vals = np.ma.masked_where(lccs_masked.mask, swi_vals)
+    scatterplot(lons, lats, swi_vals, s=150, title='SWI dataset showing '+
                 'highest correlation with NDVI', marker=',', 
-                discrete=True, binmin=0, binmax=7, bins=8, 
-                ticks=np.unique(max_corr_swi))
+                discrete=True, binmin=0, binmax=6, bins=7, 
+                ticks=key_list)
     
     max_corr_lag[np.where(np.isnan(max_corr_lag))[0]] = np.NaN
-    lag_vals = np.empty_like(max_corr_val)
+    lag_vals = max_corr_val.copy()
     
-    for idx, key in enumerate(np.unique(max_corr_lag)):
+    for idx, key in enumerate(np.unique(max_corr_lag)[:5]):
         print idx
-        lag_vals[np.where(max_corr_lag == key)] = idx 
-    scatterplot(lons, lats, lag_vals, s=200, title='Time lag showing '+
+        lag_vals[np.where(max_corr_lag == key)] = idx
+    lag_vals = np.ma.masked_where(lccs_masked.mask, lag_vals)
+    scatterplot(lons, lats, lag_vals, s=150, title='Time lag showing '+
                 'highest correlation between SWI and NDVI', marker=',', 
-                discrete=True, binmin=0, binmax=8, bins=10, 
+                discrete=True, binmin=0, binmax=5, bins=6, 
                 ticks=np.unique(max_corr_lag))
     
 

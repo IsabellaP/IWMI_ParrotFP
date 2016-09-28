@@ -6,7 +6,7 @@ from datetime import datetime
 from pygrids.warp5 import DGGv21CPv20
 from rsdata.WARP.interface import WARP
 from warp_data.interface import init_grid
-import matplotlib.pyplot as plt
+import gdal
 
 
 def read_foxy_finn(ssm_path):
@@ -214,7 +214,19 @@ def read_ts(path, params=['SWI_020'], lon=80.5, lat=6.81,
             
             df[key] = param_data.flatten()
             
-    return df
+    return df, nearest_lon, nearest_lat
+
+
+def read_AG_LC(path):
+    
+    with Dataset(path, mode='r') as ncf:
+        lons = ncf.variables['lon'][:]
+        lats = ncf.variables['lat'][:]
+        lc_mask = ncf.variables['AG_LC_dataset'][0,:,:]
+    
+    lc_mask = np.ma.masked_where((lc_mask != 1), lc_mask)
+    
+    return lc_mask, lons, lats
 
 
 def find_nearest(array, element):
@@ -222,4 +234,9 @@ def find_nearest(array, element):
     return array[idx]
 
 
-pass
+if __name__ == '__main__':
+    path = 'C:\\Users\\i.pfeil\\Desktop\\Isabella\\Peejush\\AG_Mask\\AG_LC_West_SA_0.1.nc'
+    lc_mask, lons, lats = read_AG_LC(path)
+    
+    print 'done'
+    

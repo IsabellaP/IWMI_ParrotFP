@@ -59,14 +59,14 @@ def scatterplot(lons, lats, data, s=75, title=None, marker=',', discrete=True,
     
 def scatter_subplots(lons1, lats1, data1, s1,
                      lons2, lats2, data2, s2,
-                     title1=None, title2=None):
+                     plotname, title1=None, title2=None):
     
-    fig = plt.figure()
+    fig = plt.figure(figsize=[16,20])
     
     # first subplot
     ax1 = fig.add_subplot(121)
-    m = Basemap(projection='cyl', llcrnrlat=10, urcrnrlat=35,
-                    llcrnrlon=65, urcrnrlon=85)
+    m = Basemap(projection='cyl', llcrnrlat=15.5, urcrnrlat=17,
+                    llcrnrlon=73, urcrnrlon=74.5)
     m.drawcoastlines()
     m.drawcountries()
     
@@ -88,8 +88,8 @@ def scatter_subplots(lons1, lats1, data1, s1,
     
     # second subplot
     ax2 = fig.add_subplot(122, sharex=ax1, sharey=ax1)
-    m = Basemap(projection='cyl', llcrnrlat=10, urcrnrlat=35,
-                    llcrnrlon=65, urcrnrlon=85)
+    m = Basemap(projection='cyl', llcrnrlat=15.5, urcrnrlat=17,
+                    llcrnrlon=73, urcrnrlon=74.5)
     m.drawcoastlines()
     m.drawcountries()
     
@@ -109,5 +109,7 @@ def scatter_subplots(lons1, lats1, data1, s1,
                        s=s2, vmin=0, vmax=1, cmap='RdYlGn')
     m.colorbar(sc, 'right', size='5%', pad='2%')
     
-    plt.show()
+    #plt.show()
+    plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\correct\\'+
+                plotname+'.png', bbox_inches='tight')
     
