@@ -3,22 +3,18 @@ from datetime import datetime
 from poets.poet import Poet
 
 # poets attributes:
-#===============================================================================
-# rootpath = 'C:\Users\s.hochstoger\Desktop\poets'
-# shapefile = os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
-#                          'poets', 'Box_West_SA', 'West_SA_cl2')
-# rootpath = os.path.join('C:\\', 'Users', 'i.pfeil', 'Desktop', 'poets')
-#===============================================================================
-
-rootpath = "E:\\poets\\"
-shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Documents', 
-                         '0_IWMI_DATASETS', 'shapefiles', 'IND_adm', 'IND_adm1')
-shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Desktop', 
-                         'Isabella', 'Peejush', 'Box_West_SA', 'West_SA_cl2')
+rootpath = 'C:\Users\s.hochstoger\Desktop\poets'
+shapefile = os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
+                         'poets', 'Box_West_SA', 'West_SA_cl2')
+rootpath = os.path.join('C:\\', 'Users', 'i.pfeil', 'Desktop', 'poets')
+#shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Documents', 
+#                         '0_IWMI_DATASETS', 'shapefiles', 'IND_adm', 'IND_adm1')
+#shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Desktop', 
+#                         'Isabella', 'Peejush', 'Box_West_SA', 'West_SA_cl2')
 regions = ['West_SA'] # CE...Sri Lanka, IN...India
 spatial_resolution = 0.1
 temporal_resolution = 'dekad'
-start_date = datetime(2010, 1, 1)
+start_date = datetime(2007, 1, 1)
 nan_value = -99
 
 # initializing Poet class:
@@ -36,7 +32,7 @@ p = Poet(rootpath, regions, spatial_resolution, temporal_resolution,
 # directory = "/gs/MOD11C1_D_LSTDA/"
 # begin_date = datetime(2007, 1, 1)
 # nan_value = 255
-#  
+#
 # # initializing the data source:
 # p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
@@ -56,20 +52,18 @@ p = Poet(rootpath, regions, spatial_resolution, temporal_resolution,
 # p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
 
-#===============================================================================
-# name = 'VCI'
-# filename = "VCI_{YYYY}_{MM}_{DD}.tif"
-# filedate = {'YYYY': (4, 8), 'MM': (9, 11), 'DD': (12, 14)}
-# temp_res = 'daily'
-# host = "neoftp.sci.gsfc.nasa.gov"
-# protocol = 'FTP'
-# directory = "/gs/MOD11C1_D_LSTDA/"
-# begin_date = datetime(2007, 1, 1)
-# nan_value = 255
-# 
-# p.add_source(name, filename, filedate, temp_res, host, protocol,
-#              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
-#===============================================================================
+name = 'VCI'
+filename = "VCI_{YYYY}_{MM}_{DD}.tif"
+filedate = {'YYYY': (4, 8), 'MM': (9, 11), 'DD': (12, 14)}
+temp_res = 'daily'
+host = "neoftp.sci.gsfc.nasa.gov"
+protocol = 'FTP'
+directory = "/gs/MOD11C1_D_LSTDA/"
+begin_date = datetime(2007, 1, 1)
+nan_value = 255
+
+p.add_source(name, filename, filedate, temp_res, host, protocol,
+             begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
 #
 #
 # name = 'FAPAR'
@@ -110,7 +104,7 @@ p = Poet(rootpath, regions, spatial_resolution, temporal_resolution,
 # directory = "/gs/MOD11C1_D_LSTDA/"
 # begin_date = datetime(2007, 7, 1)
 # nan_value = 255
-#     
+#    
 # p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r',
 #              variables=['SWI_001', 'SWI_010', 'SWI_020', 'SWI_040', 'SWI_060', 
@@ -127,40 +121,23 @@ p = Poet(rootpath, regions, spatial_resolution, temporal_resolution,
 # directory = "/gs/MOD11C1_D_LSTDA/"
 # begin_date = datetime(2010, 1, 1)
 # nan_value = 255
-#         
+#        
 # # initializing the data source:
 # p.add_source(name, filename, filedate, temp_res, host, protocol,
 #              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r',
 #              variables=['lccs_class'])
 #===============================================================================
 
-#===============================================================================
-# name = 'IDSI'
-# filename = "IDSI_{YYYY}_{MM}_{DD}.tif"
-# filedate = {'YYYY': (5, 9), 'MM': (10, 12), 'DD': (13, 15)}
-# temp_res = 'daily'
-# host = "neoftp.sci.gsfc.nasa.gov"
-# protocol = 'FTP'
-# directory = "/gs/MOD11C1_D_LSTDA/"
-# begin_date = datetime(2010, 1, 1)
-# nan_value = 255
-# 
-# p.add_source(name, filename, filedate, temp_res, host, protocol,
-#              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
-#===============================================================================
-
-# gapfree NDVI
-name = 'NDVI'
-filename = "NDVI_{YYYY}{MM}{DD}.nc"
-filedate = {'YYYY': (5, 9), 'MM': (9, 11), 'DD': (11, 13)}
+name = 'IDSI'
+filename = "IDSI_{YYYY}_{MM}_{DD}.tif"
+filedate = {'YYYY': (5, 9), 'MM': (10, 12), 'DD': (13, 15)}
 temp_res = 'daily'
 host = "neoftp.sci.gsfc.nasa.gov"
 protocol = 'FTP'
 directory = "/gs/MOD11C1_D_LSTDA/"
 begin_date = datetime(2010, 1, 1)
 nan_value = 255
- 
-# initializing the data source:
+
 p.add_source(name, filename, filedate, temp_res, host, protocol,
              begin_date=begin_date, nan_value=nan_value, colorbar='terrain_r')
 
@@ -168,3 +145,5 @@ p.add_source(name, filename, filedate, temp_res, host, protocol,
 begin = datetime(2010,1,1)
 end = datetime(2010,1,11)
 p.resample(begin=begin, end=end)
+
+#p.start_app()

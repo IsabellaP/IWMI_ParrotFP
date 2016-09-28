@@ -135,7 +135,7 @@ def read_LC(path, lat_min=5.9180, lat_max=9.8281,
     
     return lccs_masked
 
-def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
+def read_imgg(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
             lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2010, 7, 1),
             plot_img=False, swi='SWI_005'):
     """
@@ -213,7 +213,7 @@ def read_img(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
     return param_data
 
 
-def read_ts(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
+def read_tss(path, param='NDVI', lon=80.5, lat=6.81, gpi=None,
             start_date=datetime(2010,1,1), end_date=datetime(2010, 3, 31),
             plot_ts=False, swi_param='SWI_020'):
     """

@@ -157,6 +157,7 @@ def read_img(path, param='SWI_020', lat_min=5.9180, lat_max=9.8281,
         lat_idx = np.where((lats >= lat_min) & (lats <= lat_max))[0]
         lon_idx = np.where((lons >= lon_min) & (lons <= lon_max))[0]
         data = ncfile.variables[key][date_idx, lat_idx, lon_idx]
+        data[data < 0] = 0
 
     return data, lons[lon_idx], lats[lat_idx], nearest_date
 

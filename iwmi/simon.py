@@ -9,6 +9,8 @@ import fnmatch
 import gdal
 from pygeogrids.grids import BasicGrid
 import matplotlib.pyplot as plt
+import pytesmo.temporal_matching as temp_match
+import pytesmo.metrics as metrics
 
 
 def init_0_1_grid(str):
@@ -114,7 +116,7 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
 
     return df
 
-# ToDo: check if grouping works correctly, because of different dates each month for NDVI
+
 def anomaly(df):
     '''
     Calculates anomalies for time series. Of each day mean value of
@@ -184,15 +186,16 @@ def plot_area(lon_min, lon_max, lat_min, lat_max):
 
     map.plot(cop_grid_lons[index], cop_grid_lats[index], marker='+', linewidth=0, color='m', markersize=5)
 
+
 def plot_ts_anomalies(lat_min, lat_max, lon_min, lon_max):
     #======================== plot TS anomalies ===========
-    ndvi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\NDVI_stack.nc"
-    lai_path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\LAI_stack.nc'
-    fapar_path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\FAPAR_stack.nc'
-    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_stack.nc"
+    ndvi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\NDVI_stack.nc"
+    lai_path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\LAI_stack.nc'
+    fapar_path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\FAPAR_stack.nc'
+    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc"
 
-    #plot_area(lon_min, lon_max, lat_min, lat_max)
-    #plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + 'area.png')
+    plot_area(lon_min, lon_max, lat_min, lat_max)
+    plt.savefig('C:\Users\s.hochstoger\Desktop\Plots\\' + 'area.png')
 
     df_ndvi = read_ts_area(ndvi_path, "NDVI", lat_min, lat_max, lon_min, lon_max)
     anomaly_ndvi = anomaly(df_ndvi)
@@ -295,7 +298,7 @@ def study_area_gpis():
     gplon = pd.concat([gp, lon], axis=1)
     gplonlat = pd.concat([gplon, lat], axis=1)
     gplonlat.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\study_area_gp_lonlat_new.csv")
-    pass
+
 
 def read_img_new(path, param='NDVI', lat_min=5.9180, lat_max=9.8281,
              lon_min=79.6960, lon_max=81.8916, timestamp=datetime(2010, 7, 1),
@@ -465,7 +468,7 @@ def create_drought_dist(lat_min, lat_max, lon_min, lon_max):
     columns = ['healthy', 'watch', 'drought']
     df = pd.DataFrame([], index=[-999], columns=columns)
     for date in all_dates:
-        data = read_img(path, 'IDSI', lat_min, lat_max, lon_min, lon_max, timestamp=date)
+        data, _, _ = read_img(path, 'IDSI', lat_min, lat_max, lon_min, lon_max, timestamp=date)
         drought = np.where((data[0] == 1) | (data[0] == 2) | (data[0] == 3))[0].size
         watch = np.where((data[0] == 4) | (data[0] == 5))[0].size
         healthy = np.where((data[0] == 6) | (data[0] == 7))[0].size
@@ -488,7 +491,7 @@ def create_drought_dist(lat_min, lat_max, lon_min, lon_max):
 def plot_Droughts_and_Anomalies(lat_min, lat_max, lon_min, lon_max):
 
     df = create_drought_dist(lat_min, lat_max, lon_min, lon_max)
-    df_swi = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc', 'SWI_010',
+    df_swi = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc', 'SWI_040',
                           lat_min, lat_max, lon_min, lon_max)
     anomaly_swi = anomaly(df_swi)
 
@@ -503,29 +506,106 @@ def plot_Droughts_and_Anomalies(lat_min, lat_max, lon_min, lon_max):
     plt.grid()
     plt.axhline(0, color='black')
     plt.ylim([-1, 1])
-    plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\IDSI_SWI010_Comparison_interpolate.png',
-                dpi=450, bbox_inches='tight', pad_inches=0.3)
+    #plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\IDSI_SWI040_Comparison_interpolate_newloc.png',
+    #            dpi=450, bbox_inches='tight', pad_inches=0.3)
+
+
+def calc_corr_IDSI_SWI(lat_min, lat_max, lon_min, lon_max):
+    df = create_drought_dist(lat_min, lat_max, lon_min, lon_max)
+    df.drought = df.drought * (-1)
+    drought = pd.DataFrame(df.drought)
+    tt = [1, 5, 10, 15, 20, 40, 60, 100]
+    for t in tt:
+        print t
+        df_swi = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc',
+                              'SWI_' + str(t).zfill(3), lat_min, lat_max, lon_min, lon_max)
+        anomaly_swi = anomaly(df_swi)
+
+        df_anom = anomaly_swi.loc[:'20150626'] / 100
+        match = temp_match.matching(drought, df_anom)
+        s_rho, s_p = metrics.spearmanr(match.iloc[:, 0], match.iloc[:, 1])
+        print s_rho, s_p
+
 
 if __name__ == '__main__':
+    swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc"
+    # #df_swi = read_ts_area(swi_path, 'SWI_040', 19.204, 21, 74, 76.5754)
+    df_swi1 = read_ts(swi_path, params=['SWI_001'], lon=80.6948, lat=7.2903,
+            start_date=datetime(2007, 7, 1), end_date=datetime(2016, 5, 31))
+    df_swi2 = read_ts(swi_path, params=['SWI_001'], lon=80.4687, lat=8.1135,
+            start_date=datetime(2007, 7, 1), end_date=datetime(2016, 5, 31))
+    # anomaly_swi = anomaly(df_swi)
+    # df_anom = anomaly_swi/100
+    #
+    # df_anom.plot.area(stacked=False, figsize=[20, 5], color='b', ylim=[-0.2, 0.2])
+    # plt.axhline(-0.09, color='r', linewidth=2)
+    # plt.axhline(-0.03, color='y', linewidth=2)
+    # plt.axhline(0.03, color='limegreen', linewidth=2)
+    # plt.axhline(0.09, color='darkgreen', linewidth=2)
+
     #calc_monthly_mean('SWI')
-    #ccits = read_ts('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\CCI_stack.nc', 'sm',
+    #plot_Droughts_and_Anomalies(21.38, 22.30, 70, 72)
+    #calc_corr_IDSI_SWI(21.38, 22.30, 70, 72)
+    #plot_ts_anomalies(21.38, 22.30, 70, 72)
+    #plot_ts_anomalies(21.204, 23, 75, 77.5754)
+    #plot_Droughts_and_Anomalies(21.204, 23, 75, 77.5754)
+
+    # ====== CCI ===========
+    # ccits = read_ts('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\CCI_stack.nc', 'sm',
     #                75, 20, start_date=datetime(1978, 11, 1), end_date=datetime(2014, 12, 1))
-    #cci = ccits[ccits != 255]
-    #cci = cci.dropna(axis=0)
+    # cci = ccits[ccits != 255]
+    # cci = cci.dropna(axis=0)
+    # cci = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\CCI_stack.nc', 'sm',
+    #                   19.204, 21, 74, 76.5754)
+    #
+    #
+    # years = np.arange(1978, 2015, 1)
+    # months = np.arange(1, 13, 1)
+    # days = [1, 10, 20]
+    # dates = pd.DatetimeIndex([])
+    # for year in years:
+    #     for month in months:
+    #         date = [datetime(year, month, 1), datetime(year, month, 10), datetime(year, month, 20)]
+    #         index = pd.DatetimeIndex(date)
+    #         dates = dates.append(index)
+    # df_10 = pd.DataFrame([], index=dates, columns=['nan'])
+    # cci_10 = cci.resample('10d').mean()
+    # match = temp_match.matching(df_10, cci_10)
+    # =========================================
 
-    #cci = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\CCI_stack.nc', 'sm',
-    #                  19.204, 21, 74, 76.5754)
-    #df = plot_Droughts_and_Anomalies(19.204, 21, 74, 76.5754)
-    rf = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\TRMM_RF_stack.nc', 'TRMM_RF',
-                      19.204, 21, 74, 76.5754)
-    rf_10d = rf.resample('10d').mean()
-    rf_m = rf.resample('M').mean()
-
-    anom1 = anomaly(rf)
-    anom2 = anomaly(rf_m)
-
-    test = read_img('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\TRMM_RF_stack.nc', 'TRMM_RF',
-                    14.7148, 29.3655, 68.15, 81.8419, timestamp=datetime(2013, 2, 2))
+    # ====== RAINFALL ===============
+    # sm = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc', 'SWI_001',
+    #                   21.38, 22.30, 70, 72)
+    #
+    # rf = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\TRMM_RF_stack.nc', 'TRMM_RF',
+    #                   21.38, 22.30, 70, 72)
+    # rf_10d = rf.resample('10d').mean()
+    #
+    # match = temp_match.matching(sm, rf_10d)
+    # s_rho, s_p = metrics.spearmanr(match.iloc[:, 0], match.iloc[:, 1])
+    #
+    # fig = plt.figure(figsize=[25, 10])
+    # ax = fig.add_subplot(111)
+    # lns1 = ax.plot(sm, label='Soil Moisture', color='g')
+    # ax2 = ax.twinx()
+    # lns2 = ax2.plot(rf.loc['20070701':], label='Rainfall', color='b')
+    # ax.set_ylabel("Degree of Saturation [%]", fontsize=20)
+    # ax2.set_ylabel("Rainfall [mm]", fontsize=20)
+    # ax.set_ylim(0, 100)
+    # ax2.set_ylim(0, 200)
+    # lns = lns1 + lns2
+    # labs = [l.get_label() for l in lns]
+    # ax.legend(lns, labs, loc=0, fontsize=20)
+    # plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\SSM_Rainfall2.png',
+    #             dpi=450, bbox_inches='tight', pad_inches=0.3)
+    # rf_m = rf.resample('M').mean()
+    #
+    # anom1 = anomaly(rf)
+    # anom2 = anomaly(rf_m)
+    #
+    # test = read_img('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\TRMM_RF_stack.nc', 'TRMM_RF',
+    #                 14.7148, 29.3655, 68.15, 81.8419, timestamp=datetime(2013, 2, 2))
+    # ====================================
 
     d=1
     # gg=init_0_1_grid('NDVI')
