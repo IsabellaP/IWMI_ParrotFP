@@ -384,7 +384,7 @@ def init_SWI_grid(fpath=None):
     return grid
 
 
-def init_poets_grid(fpath=None):
+def init_0_4_grid(fpath=None):
     
     if fpath is None:
         fpath = "C:\\Users\\i.pfeil\\Desktop\\poets\\DATA\\alt\\"

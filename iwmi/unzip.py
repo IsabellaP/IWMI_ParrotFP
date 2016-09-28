@@ -2,7 +2,7 @@ import os
 import numpy as np
 import shutil
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from netCDF4 import Dataset, date2num
 import gdal
 
@@ -21,7 +21,7 @@ def unzip(path_in, path_out):
         
         
 def format_to_folder(root, formatstr, out_path):
-    """ Looks for files of format formatstr in all subfolders of root and moves
+    """ Looks for files of format formatstr in all subfolders of root and copies
     the files to out_path
     """
     
@@ -107,7 +107,7 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
     print 'Finished.'
     
     
-def read_tiff(srcpath, fname, coord_alt=True):
+def read_tiff(srcpath, fname, coord_alt=False):
     
     src_filename = os.path.join(srcpath, fname)
 
@@ -202,7 +202,15 @@ def merge_tiff(path, new_path, new_tiff, variable, datestr):
             print idx
             data_single, _, _ = read_tiff(path, tiff)
             print data_single.shape
-            data[idx,:,:] = data_single
+            if data_single.shape == lons.shape:
+                data[idx,:,:] = data_single
+            elif data_single.shape == (3518,7401):
+                # hard coded for NDVI gapfree
+                print idx, "dims change"
+                data[idx,:-1,:] = data_single
+            else:
+                print "continue"
+                continue
             
             year = int(tiff[datestr['year'][0]:datestr['year'][1]])
             month = int(tiff[datestr['month'][0]:datestr['month'][1]])
@@ -212,28 +220,27 @@ def merge_tiff(path, new_path, new_tiff, variable, datestr):
             times[idx] = numdate     
         
     print 'Finished.'
+
+
+def rename_files():
     
+    path = 'E:\\_DATA\\NDVI_2001-15_gapfree\\WGS84\\'
+    fnames = os.listdir(path)
+    
+    for f in fnames:
+        print f, datetime.now()
+        year = f[5:9]
+        doy = f[10:13]
+        date = datetime(int(year), 1, 1) + timedelta(int(doy) - 1)
+        f_new = 'NDVI_'+str(year)+str(date.month).zfill(2)+str(date.day).zfill(2)+'.tif'
+        os.rename(os.path.join(path, f), os.path.join(path, f_new))
+
 
 if __name__ == '__main__':
+       
+    path = "E:\\poets\\RAWDATA\\NDVI\\"
+    new_path = "E:\\poets\\RAWDATA\\"
+    datestr = {'year': (5,9), 'month': (9,11), 'day': (11,13)} # NDVI gapfree
+    merge_tiff(path, new_path, 'NDVI_stack.nc', 'NDVI', datestr)
     
-    #path_in = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR_zipped'
-    #path_out = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR'
-     
-    #unzip(path_in, path_out)
-     
-    root = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\'
-    formatstr = '.nc'
-    out_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\IDSI\\'
-    #format_to_folder(root, formatstr, out_path)
-     
-    new_path = 'C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\'
-    #datestr = {'year': (16,20), 'month': (20,22), 'day': (22,24)} # SWI
-    #datestr = {'year': (15,19), 'month': (19,21), 'day': (21,23)} # NDVI
-    #datestr = {'year': (16,20), 'month': (20,22), 'day': (22,24)} # FAPAR
-    #datestr = {'year': (14,18), 'month': (18,20), 'day': (20,22)} # LAI
-    #merge_nc(out_path, new_path, ['FAPAR'], datestr)
-     
-    datestr = {'year': (5,9), 'month': (10,12), 'day': (13,15)} # IDSI
-    #merge_tiff(out_path, new_path, 'IDSI_stack.nc', 'IDSI', datestr)
-    
-    read_tiff(out_path, 'IDSI_2010_01_01.tif')
+    print "done"

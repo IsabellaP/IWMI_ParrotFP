@@ -4,12 +4,10 @@ import pandas as pd
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
-from netCDF4 import Dataset
 from Basemap_scatterplot import scatterplot
 import matplotlib.colors as cls
 
-from readers import read_ts, read_img, read_LC
-from data_readers import read_poets_nc, init_SWI_grid, init_poets_grid
+from readers import read_ts, read_img
 
 import pytesmo.scaling as scaling
 import pytesmo.temporal_matching as temp_match
@@ -141,8 +139,8 @@ def corr(paths, corr_df, start_date, end_date, lon=None, lat=None,
                 rho, p = metrics.spearmanr(data_together[ds_water], 
                                            data_together[ds_veg])
                 # mask values with p-value > 0.05
-                #if p > 0.05:
-                #    rho = np.NaN
+                if p > 0.05:
+                    rho = np.NaN
                 if ds_veg+'_'+ds_water+'_rho' in corr_df.columns:
                     corr_df[ds_veg+'_'+ds_water+'_rho'].iloc[np.where(corr_df.index==
                                                                   time_lag)] = rho
@@ -227,143 +225,7 @@ def plot_rho(max_rho, lons, lats):
         plt.savefig('C:\\Users\\i.pfeil\\Desktop\\timelags\\'+SWI_key+'.png', bbox_inches='tight')
     
     print 'done'
-
-
-def zribi(paths, lon, lat, start_date, end_date, t_val='SWI_020', vi_str='NDVI', 
-          plot_fig=False, monthly=False):
     
-    """ Simulate VI from SWI as in Zribi et al., 2010.
-    
-    Parameters:
-    -----------
-    paths : dict
-        Paths to datasets
-    gpi : int
-        grid point (WARP grid, see http://rs.geo.tuwien.ac.at/dv/dgg/)
-    start_date, end_date : datetime
-        Start and end date
-    t_val : str, optional
-        T value, default: 20
-    vi_str : str, optional
-        Vegetation index to use, default: NDVI
-    plot_fig : bool, optional
-        If true, functions from which k and d are derived are plotted, 
-        default: False
-    monthly : bool, optional
-        If true, data is resampled monthly, default: False
-    
-    Returns:
-    --------
-    vi_sim : np.array
-        Array containing simulated VI
-    """
-    
-    swi_path = paths['SWI']
-    vi_path = paths[vi_str]
-    
-    swi_list = ['SWI_001', 'SWI_010', 'SWI_020', 'SWI_040', 'SWI_060', 'SWI_100']
-    swi_df = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
-                     start_date=start_date, end_date=end_date)
-    vi = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
-                 start_date=start_date, end_date=end_date)
-    vi[vi_str][np.where(vi==255)[0]] = np.NaN
-    
-    swi = swi_df[t_val]
-    
-    # resample monthly
-    if monthly:
-        swi = swi.resample("M").mean()
-        vi = vi.resample("M").mean()
-
-    # calculate differences between VIs of consecutive months
-    dvi = np.ediff1d(vi, to_end=np.NaN)
-    vi['D_VI'] = pd.Series(dvi, index=vi.index)
-    matched_data = temp_match.matching(swi, vi)
-      
-    # calculate parameters k and d only from 2007-2010 data
-    sim_start = '2007'
-    sim_end = '2010'
-    if monthly:
-        grouped_data = matched_data[sim_start:
-                                    sim_end].groupby(matched_data[sim_start:
-                                                    sim_end].index.month)
-    else:
-        grouped_data = matched_data[sim_start:
-                                    sim_end].groupby([matched_data[sim_start:
-                                                    sim_end].index.month, 
-                                                    matched_data[sim_start:
-                                                    sim_end].index.day])
-      
-    kd = {}
-    for key, _ in grouped_data:
-        x = grouped_data[t_val].get_group(key)
-        y = grouped_data['D_VI'].get_group(key)
-        k, d = np.polyfit(x, y, 1)
-        kd[key] = [k, d]
-        if plot_fig:
-            plt.plot(x, y, '*')
-            plt.plot(np.arange(100), np.arange(100)*k+d, "r")
-            plt.title('Month, Day: '+str(key)+', f(x) = '+str(round(k, 3))+
-                      '*x + '+str(round(d, 3)))
-            plt.xlabel(t_val)
-            plt.ylabel('D_VI')
-            plt.show()
-      
-    # simulation - integrate forecast length
-    vi_sim = [vi[vi_str][0]]
-    for i in range(1,len(matched_data)):
-        print i, matched_data.index[i]
-        try:
-            if monthly:
-                k, d = kd[matched_data.index[i].month]
-            else:
-                k, d = kd[(matched_data.index[i].month,
-                           matched_data.index[i].day)]
-        except KeyError:
-            vi_sim.append(vi_sim[i-1])
-            if monthly:
-                print 'no k, d values for month '+str(matched_data.index[i].month)
-            else:
-                print 'no k, d values for '+str((matched_data.index[i].month,
-                                                 matched_data.index[i].day))
-            continue
-          
-        prev_date = (matched_data.index[i]-matched_data.index[i-1]).days
-        if monthly:
-            prev_lim = 60
-        else:
-            prev_lim = 20
-        if prev_date > prev_lim: # days to latest available vi value
-            vi_prev = np.NaN # NaN if latest vi value is older than prev_date
-        else:
-            # use vi instead of vi_sim to keep the forecast length of 10 days
-            vi_prev = matched_data[vi_str][i-1]
-        vi_sim1 = vi_prev + k*matched_data[t_val][i] + d
-        print vi_prev, k, d, vi_sim1
-        vi_sim.append(vi_sim1)
-    
-    # plot results
-    if monthly:
-        results = pd.DataFrame(vi[vi_str].values*100, columns=[vi_str], index=vi.index)
-        results[t_val] = pd.Series(swi.values, index=swi.index)
-        results[vi_str+'_sim'] = pd.Series(np.multiply(vi_sim, 100), 
-                                        index=matched_data.index)
-        
-    else:
-        results = pd.DataFrame(matched_data[t_val].values, columns=[t_val],
-                               index=matched_data.index)
-        results[vi_str] = pd.Series(matched_data[vi_str].values*100, 
-                                    index=matched_data.index)
-        results[vi_str+'_sim'] = pd.Series(np.multiply(vi_sim, 100), 
-                                           index=matched_data.index)
-        
-    print results
-    results.plot()
-    plt.title('Lon: '+str(lon)+', lat: '+str(lat)+', t value: '+t_val)
-    plt.show()
-      
-    return vi_sim
-
 
 def avg_gpis(param, path, start_date=datetime(2008,1,1), 
              end_date=datetime(2009,1,1), swi_key=None,
@@ -436,7 +298,7 @@ def LC_mask(lons, lats, search_rad=80000):
     urban = (lccs_resamp == -66)    
     water = (lccs_resamp == -46)
     snow_and_ice = (lccs_resamp == -36)
-    
+        
     mask_out = ((no_data) | (urban) | (water) | (snow_and_ice))
     lccs_masked = np.ma.masked_where(mask_out, lccs_resamp)
     
@@ -446,130 +308,56 @@ def LC_mask(lons, lats, search_rad=80000):
 def plot_max_timelags(lons, lats):
     
     max_corr_val = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_val.npy')
-    scatterplot(lons, lats, max_corr_val, s=75, title=None, marker=',', 
-                discrete=True, binmin=0, binmax=1, bins=20)
-    
     max_corr_swi = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_swi.npy')
-    swi_vals = np.empty_like(max_corr_val)
+    max_corr_lag = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag.npy')
     
+    lccs_masked = LC_mask(lons, lats)
+    max_corr_val = np.ma.masked_where(lccs_masked.mask, max_corr_val)
+    max_corr_swi = np.ma.masked_where(lccs_masked.mask, max_corr_swi)
+    max_corr_lag = np.ma.masked_where(lccs_masked.mask, max_corr_lag)
+    
+    scatterplot(lons, lats, max_corr_val, s=200, title='Maximum correlation '+
+                'between SWI and NDVI', marker=',', 
+                discrete=True, binmin=0, binmax=1, bins=20, 
+                ticks=np.linspace(0,1,20))
+    
+    
+    swi_vals = np.empty_like(max_corr_val)
+     
     for idx, key in enumerate(np.unique(max_corr_swi)):
         print idx
         swi_vals[np.where(max_corr_swi == key)] = idx 
-    scatterplot(lons, lats, swi_vals, s=75, title=None, marker=',', 
-                discrete=True, binmin=0, binmax=1, bins=20)
+    scatterplot(lons, lats, swi_vals, s=200, title='SWI dataset showing '+
+                'highest correlation with NDVI', marker=',', 
+                discrete=True, binmin=0, binmax=7, bins=8, 
+                ticks=np.unique(max_corr_swi))
     
-    max_corr_lag = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag.npy')
-    scatterplot(lons, lats, max_corr_val, s=75, title=None, marker=',', 
-                discrete=True, binmin=0, binmax=1, bins=20)
+    max_corr_lag[np.where(np.isnan(max_corr_lag))[0]] = np.NaN
+    lag_vals = np.empty_like(max_corr_val)
     
+    for idx, key in enumerate(np.unique(max_corr_lag)):
+        print idx
+        lag_vals[np.where(max_corr_lag == key)] = idx 
+    scatterplot(lons, lats, lag_vals, s=200, title='Time lag showing '+
+                'highest correlation between SWI and NDVI', marker=',', 
+                discrete=True, binmin=0, binmax=8, bins=10, 
+                ticks=np.unique(max_corr_lag))
     
 
+def plot_corr_new(lons, lats):
+    
+    swi = {}
+    swi['swi001'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi001.npy')
+    swi['swi010'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi010.npy')
+    swi['swi020'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi020.npy')
+    swi['swi040'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi040.npy')
+    swi['swi060'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi060.npy')
+    swi['swi100'] = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\corr_swi100.npy')
 
-if __name__ == '__main__':
-    
-    # read Sri Lanka gpis
-    #gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_India_warp.csv"
-    #gpis_df = pd.read_csv(gpi_path)
-    #ind = np.where(gpis_df['cell']==1821)[0]
-    #gpis1821 = gpis_df['point'].values[ind]
-    
-    # set paths to datasets
-    ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
-    lcpath = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\LC\\ESACCI-LC-L4-LCCS-Map-300m-P5Y-20100101-West_SA-v1.6.1.nc"
-    ndvi_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\NDVI\\NDVI_stack.nc"
-    ndvi300_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\NDVI300\\"
-    lai_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\LAI\\"
-    swi_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\SWI\\SWI_stack.nc"
-    fapar_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\VIs\\FAPAR\\"
-    
-    paths = {'ssm': ssm_path, 'lc': lcpath, 'NDVI300': ndvi300_path, 
-             'NDVI': ndvi_path, 'LAI': lai_path, 'SWI': swi_path, 
-             'FAPAR': fapar_path}
-    
-    #===========================================================================
-    # lon = 73.8
-    # lat = 21
-    # start_date = datetime(2007,7,1)
-    # end_date = datetime(2015,7,1)
-    # zribi(paths, lon, lat, start_date, end_date, t_val='SWI_020', vi_str='NDVI',
-    #       plot_fig=False, monthly=False)
-    #===========================================================================
-    
-    #===========================================================================
-    # grid = init_SWI_grid()
-    # lons = grid.activearrlon
-    # lats = grid.activearrlat
-    #===========================================================================
-      
-    #===========================================================================
-    # # shpfile-bbox
-    # lonlat_idx = np.where((lats>=14.7) & (lats<=29.4) & (lons>=68.0) & 
-    #                       (lons<=81.8))[0]
-    # lons_shp = lons[lonlat_idx]
-    # lats_shp = lats[lonlat_idx]
-    #===========================================================================
-     
-    # poets lonlat
-    #grid = init_SWI_grid()
-    grid = init_poets_grid()
-    gpis, lons, lats = grid.get_grid_points()
-    print gpis.shape
-    
-    #plot_max_timelags(lons, lats)
-      
-    start_date = datetime(2007, 7, 1)
-    end_date = datetime(2015, 7, 1)
-    max_rho = {}
-    time_lags = [0, 10, 20, 30, 40, 50, 60, 100]
-    corr_df = pd.DataFrame([], index=time_lags)
-     
-    max_corr_val = []
-    max_corr_swi = []
-    max_corr_lag = []
-            
-    for i in range(len(gpis)):
-        print i, lons[i], lats[i]
-        corr_df = corr(paths, corr_df, start_date, end_date, lon=lons[i], 
-                       lat=lats[i], vi_str='NDVI')
-        print corr_df
-        #max_rho = max_corr(corr_df, max_rho)
-         
-        max_corr_val.append(corr_df.max(axis=0).max())
-        max_corr_swi.append(corr_df.max(axis=0).idxmax())
-        max_corr_lag.append(corr_df.max(axis=1).idxmax())
-     
-    max_corr_val = np.array(max_corr_val)
-    max_corr_swi = np.array(max_corr_swi)
-    max_corr_lag = np.array(max_corr_lag)
-     
-    #===========================================================================
-    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_val.npy', 
-    #         max_corr_val)
-    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_swi.npy', 
-    #         max_corr_swi)
-    # np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_corr_lag.npy', 
-    #         max_corr_lag)
-    #===========================================================================
-    
-    #print max_rho
-    #np.save('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_rho_2007_2015.npy', 
-    #        max_rho)
+    lccs_masked = LC_mask(lons, lats)
 
-    #===========================================================================
-    # max_rho = np.load('C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA\\max_rho_2007_2015.npy').item()
-    #    
-    # # read LC 300m
-    # #lc = read_LC(lcpath, 14.7, 29.4, 68, 81.8)
-    #    
-    # lccs_masked = LC_mask(lons, lats, search_rad=80000)
-    # #scatterplot(lons, lats,lccs_masked, s=75, title='ESA CCI land cover classes, 0.4 deg.')
-    #        
-    # max_rho_masked = {}
-    # for key in max_rho:
-    #     max_rho_masked[key] = np.ma.array(max_rho[key], mask=lccs_masked.mask)
-    #         
-    # # plot maps showing time lag with highest rho
-    # plot_rho(max_rho_masked, lons, lats)
-    #===========================================================================
-     
-    print 'done'
+    for key in swi:
+        swi[key] = np.ma.masked_where(lccs_masked.mask, swi[key]) 
+        scatterplot(lons, lats, swi[key], s=30, title='Correlation between '+
+                    key+' and NDVI at a timelag of 3 days', marker=',', 
+                    discrete=False, key=key)
