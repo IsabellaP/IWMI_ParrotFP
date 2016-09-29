@@ -12,7 +12,7 @@ from data_analysis import rescale_peng
 from Basemap_scatterplot import scatter_subplots, scatterplot
 
 
-def validate_prediction(pred, plotname):
+def validate_prediction(pred, vi_path, plotname):
 
     lons = pred[:,0]
     lats = pred[:,1]
@@ -27,7 +27,6 @@ def validate_prediction(pred, plotname):
     shpfile = Shape(region, shapefile=shapefile)
     lon_min, lat_min, lon_max, lat_max = shpfile.bbox
     
-    vi_path = "E:\\poets\\RAWDATA\\NDVI\\NDVI_gapfree.nc"
     vi_ts = datetime(timestamp.year, timestamp.month, timestamp.day)
     vi_data, vi_lons, vi_lats, vi_date = read_img(vi_path, param='NDVI', 
                                                   lat_min=lat_min, lat_max=lat_max,
@@ -42,13 +41,14 @@ def validate_prediction(pred, plotname):
     
     scatter_subplots(lons, lats, data, 250, 
                      vi_lon, vi_lat, vi_data, 1, plotname,
-                     title1=str(vi_date)+' - simulated',
-                     title2=str(vi_date)+' - orig. data')
+                     llcrnrlat=lat_min-0.5, urcrnrlat=lat_max+0.5,
+                     llcrnrlon=lon_min-0.5, urcrnrlon=lon_max+0.5,
+                     vi_date=vi_date)
     
     return pred
 
-def start_pred(paths, region, pred_date, vi_str='NDVI', t_val='SWI_040', 
-               monthly=False):
+def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
+               mode='calc_kd'):
     
     with Dataset(paths['SWI'], 'r') as ncfile:
         res_lons = ncfile.variables['lon'][:]
@@ -66,10 +66,13 @@ def start_pred(paths, region, pred_date, vi_str='NDVI', t_val='SWI_040',
     lons = res_lons[np.where((res_lons>=lon_min) & (res_lons<=lon_max))]
     lats = res_lats[np.where((res_lats>=lat_min) & (res_lats<=lat_max))]
     
-    start_date = datetime(2007,7,1)
-    end_date = datetime(2015,7,1)
+    start_date = datetime(2011,1,1)
+    end_date = datetime(2015,07,31)
     
-    results = []
+    results1 = []
+    results2 = []
+    results3 = []
+    results4 = []
     for lon in lons:
         for lat in lats:
             print lon, lat
@@ -87,41 +90,79 @@ def start_pred(paths, region, pred_date, vi_str='NDVI', t_val='SWI_040',
             vi_path = paths[vi_str]
             
             swi_list = [t_val]
-            swi_df = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
-                             start_date=start_date, end_date=end_date)
-            vi_all = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
-                             start_date=start_date, end_date=end_date)
-            vi_all[vi_str][np.where((vi_all<0)|(vi_all>1))[0]] = np.NaN
+            swi_df, _, _ = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
+                                   start_date=start_date, end_date=end_date)
+            vi_all, _, _ = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
+                                   start_date=start_date, end_date=datetime.today())
+            vi_df = vi_all[:end_date]
+            vi_all = rescale_peng(vi_all, np.nanmin(vi_all), np.nanmax(vi_all))
             
-            vi = vi_all[:pred_date]
-            vi_min = np.nanmin(vi)
-            vi_max = np.nanmax(vi)
-            vi = rescale_peng(vi, vi_min, vi_max)
+            # consider leap years
+            leap_years = np.where((vi_df.index.year%4 == 0) & 
+                                  (vi_df.index.month >= 3))[0]
+            new_idx = vi_df.index[leap_years] + timedelta(1)
+            idx_array = np.array(vi_df.index)
+            idx_array[leap_years] = new_idx
+            vi_df.index = idx_array
+
+            vi_df[vi_str][np.where((vi_df<0)|(vi_df>1))[0]] = np.NaN
+            if len(np.where(~np.isnan(vi_df[vi_str]))[0]) == 0:
+                print 'Time series is NaN'
+                continue
             
-            swi_all = swi_df[t_val]
-            swi = swi_all[:pred_date]
-            swi = rescale_peng(swi, np.nanmin(swi), np.nanmax(swi))
-    
-            # resample monthly
-            if monthly:
-                swi = swi.resample("M").mean()
-                vi = vi.resample("M").mean()
+            vi_min = np.nanmin(vi_df)
+            vi_max = np.nanmax(vi_df)
+            vi = rescale_peng(vi_df, vi_min, vi_max)
+            
+            swi = rescale_peng(swi_df, np.nanmin(swi_df), np.nanmax(swi_df))
             
             # calculate differences between VIs of consecutive months
             dvi = np.ediff1d(vi, to_end=np.NaN)
             vi['D_VI'] = pd.Series(dvi, index=vi.index)
             matched_data = temp_match.matching(swi, vi)
             
-            kd = calc_kd(swi, vi, matched_data)
-            results = predict_vegetation(lon, lat, swi, vi, 
-                                         matched_data, kd, vi_min, vi_max,
-                                         results=results)
-        
-    np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results.npy', results)
+            if mode == 'calc_kd':
+                kd = calc_kd(swi, vi, matched_data)
+                np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                        '01_kd_param\\'+str(lon)+'_'+str(lat)+'.npy', kd)
+            elif mode == 'pred':
+                kd = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                             '01_kd_param\\'+str(lon)+'_'+str(lat)+'.npy').item()
+                results1, results2, results3, results4 = predict_vegetation(lon, 
+                                                        lat, swi, vi, 
+                                                        matched_data, kd, 
+                                                        vi_min, vi_max,
+                                                        results1=results1,
+                                                        results2=results2,
+                                                        results3=results3,
+                                                        results4=results4,
+                                                        vi_all=vi_all)
+    
+    if mode == 'pred':
+        ts1 = np.unique(np.array(results1)[:,3])[0]
+        ts1_str = str(ts1.year).zfill(4)+str(ts1.month).zfill(2)+str(ts1.day).zfill(2)
+        ts2 = np.unique(np.array(results2)[:,3])[0]
+        ts2_str = str(ts2.year).zfill(4)+str(ts2.month).zfill(2)+str(ts2.day).zfill(2)
+        ts3 = np.unique(np.array(results3)[:,3])[0]
+        ts3_str = str(ts3.year).zfill(4)+str(ts3.month).zfill(2)+str(ts3.day).zfill(2)
+        ts4 = np.unique(np.array(results4)[:,3])[0]
+        ts4_str = str(ts4.year).zfill(4)+str(ts4.month).zfill(2)+str(ts4.day).zfill(2)
+        np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                '02_results\\'+str(region)+'_'+ts1_str+'.npy', 
+                results1)
+        np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                '02_results\\'+str(region)+'_'+ts2_str+'.npy', 
+                results2)
+        np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                '02_results\\'+str(region)+'_'+ts3_str+'.npy', 
+                results3)
+        np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                '02_results\\'+str(region)+'_'+ts4_str+'.npy', 
+                results4) 
 
 
 def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI', 
-             plot_fig=False, monthly=False):
+             plot_fig=False):
     
     """ Simulate VI from SWI as in Zribi et al., 2010.
     
@@ -149,19 +190,11 @@ def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI',
         Array containing simulated VI
     """
 
-    # calculate parameters k and d only from 2007-2012 data
-    sim_start = '2007'
+    # calculate parameters k and d based on data until 2015
     sim_end = '2015'
-    if monthly:
-        grouped_data = matched_data[sim_start:
-                                    sim_end].groupby(matched_data[sim_start:
-                                                    sim_end].index.month)
-    else:
-        grouped_data = matched_data[sim_start:
-                                    sim_end].groupby([matched_data[sim_start:
-                                                    sim_end].index.month, 
-                                                    matched_data[sim_start:
-                                                    sim_end].index.day])
+    
+    grouped_data = matched_data[:sim_end].groupby([matched_data[:sim_end].index.month, 
+                                                   matched_data[:sim_end].index.day])
       
     kd = {}
     for key, _ in grouped_data:
@@ -183,37 +216,28 @@ def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI',
       
 def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max, 
                        t_val='SWI_040', vi_str='NDVI', plot_fig=False, 
-                       monthly=False, results=[]):
+                       results1=[], results2=[], results3=[], results4=[],
+                       vi_all=None):
     
     vi_sim = []
     for i in range(0,len(matched_data)):
-        #print i, matched_data.index[i]
         try:
-            if monthly:
-                k, d = kd[matched_data.index[i].month]
-            else:
-                k, d = kd[(matched_data.index[i].month,
-                           matched_data.index[i].day)]
+            k, d = kd[(matched_data.index[i].month,
+                       matched_data.index[i].day)]
         except KeyError:
             if len(vi_sim) > 0:
                 vi_sim.append(vi_sim[i-1])
             else:
                 vi_sim.append(np.NaN)
-            if monthly:
-                print 'no k, d values for month '+str(matched_data.index[i].month)
-            else:
-                print 'no k, d values for '+str((matched_data.index[i].month,
-                                                 matched_data.index[i].day))
+            print 'no k, d values for '+str((matched_data.index[i].month,
+                                             matched_data.index[i].day))
             continue
 
         if len(vi_sim) == 0:
-            prev_date = 10
+            prev_date = 8
         else:
             prev_date = (matched_data.index[i]-matched_data.index[i-1]).days
-        if monthly:
-            prev_lim = 60
-        else:
-            prev_lim = 20
+        prev_lim = 20
         if prev_date > prev_lim: # days to latest available vi value
             vi_prev = np.NaN # NaN if latest vi value is older than prev_date
             vi_sim[-1] = np.NaN # otherwise june predicts october for example
@@ -224,54 +248,102 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
         #print vi_prev, k, d, vi_sim1
         vi_sim.append(vi_sim1)
     
-    # plot results
-    if monthly:
-        results = pd.DataFrame(vi[vi_str].values*100, columns=[vi_str], index=vi.index)
-        results[t_val] = pd.Series(swi.values, index=swi.index)
-        results[vi_str+'_sim'] = pd.Series(np.multiply(vi_sim, 100), 
-                                        index=matched_data.index)
-        
-    else:
-        # vi_sim is shifted 1 dekade comapred to matched_data
-        new_idx = matched_data.index[1:]
-        if len(new_idx) == 0:
-            return results
-        if new_idx[-1].day == 21:
-            if new_idx[-1].month == 12:
-                new_idx = new_idx.append(pd.Index([datetime(new_idx[-1].year+1, 
-                                                            1, 1)]))
-            else:
-                new_idx = new_idx.append(pd.Index([datetime(new_idx[-1].year, 
-                                                  new_idx[-1].month+1, 1)]))
+    # calculate SWI climatology
+    clim = swi[t_val].groupby([swi[t_val].index.month, 
+                               swi[t_val].index.day]).mean()
+    
+    # predict further into future
+    new_idx = matched_data.index[1:]
+    new_timestamp = matched_data.index[-1]
+    for i in range(4):
+        if new_timestamp.month == 12 and new_timestamp.day == 27:
+            new_timestamp = datetime(new_timestamp.year+1, 1, 1)
         else:
-            new_idx = new_idx.append(pd.Index([new_idx[-1]+timedelta(10)]))
-        
-        df_sim = pd.DataFrame(vi_sim, columns=[vi_str+'_sim'], index=new_idx)
+            new_timestamp = new_timestamp + timedelta(8)
+        try:
+            k, d = kd[(new_timestamp.month,
+                       new_timestamp.day)]
+        except KeyError:
+            if len(vi_sim) > 0:
+                vi_sim.append(vi_sim[i-1])
+            else:
+                vi_sim.append(np.NaN)
+            print 'no k, d values for '+str((new_timestamp.month,
+                                             new_timestamp.day))
+            continue
+        vi_prev = vi_sim[-1]
+        vi_sim1 = vi_prev + k*clim[new_timestamp.month, new_timestamp.day] + d
+        vi_sim.append(vi_sim1)
+        new_idx = new_idx.append(pd.Series(index=[new_timestamp]).index)
+    
+    # plot results
+    # vi_sim is shifted 8 days compared to matched_data
+    if len(new_idx) == 0:
+        return results1, results2, results3, results4
+    if new_idx[-1].day == 21:
+        if new_idx[-1].month == 12:
+            new_idx = new_idx.append(pd.Index([datetime(new_idx[-1].year+1, 
+                                                        1, 1)]))
+        else:
+            new_idx = new_idx.append(pd.Index([datetime(new_idx[-1].year, 
+                                              new_idx[-1].month+1, 1)]))
+    else:
+        new_idx = new_idx.append(pd.Index([new_idx[-1]+timedelta(8)]))
+    
+    df_sim = pd.DataFrame(vi_sim, columns=[vi_str+'_sim'], index=new_idx)
+    
+    plt.figure(figsize=[28,18])
+    ax=vi['NDVI'].plot(color='g')
+    df_sim[:-4].plot(color='k', ax=ax)
+    df_sim[-5:].plot(color='r', ax=ax)
+    vi_all[vi.index[-1]:].plot(color='b', ax=ax)
+    lgd = plt.legend(['NDVI_orig', 'NDVI_calib', 'NDVI_sim', 'NDVI_valid'],
+                     loc='center left', bbox_to_anchor=(1, 0.5), fontsize=20)
+    plt.title('lon: '+str(lon)+', lat: '+str(lat), fontsize=24)
+    plt.grid()
+    xlabels = ax.get_xticklabels()
+    plt.setp(xlabels, rotation=45, fontsize=20)
+    ylabels = ax.get_yticklabels()
+    plt.setp(ylabels, fontsize=20)
+    plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                '03_plots_1508\\'+str(lon)+'_'+str(lat)+'.png', 
+                bbox_extra_artists=(lgd,), bbox_inches='tight')
+    plt.clf()
     
     # scale back and consider data gaps
     vi = vi[vi_str]
         
     res = vi_sim[-1]*(vi_max - vi_min)/100 + vi_min
-    results.append([lon, lat, res, new_idx[-1]])
+    results1.append([lon, lat, res, new_idx[-4]])
+    results2.append([lon, lat, res, new_idx[-3]])
+    results3.append([lon, lat, res, new_idx[-2]])
+    results4.append([lon, lat, res, new_idx[-1]])
 
-    return results
+    return results1, results2, results3, results4
 
 
 if __name__ == '__main__':
     
-    # set paths to datasets
-    ndvi_gapfree = "E:\\poets\\RAWDATA\\NDVI_stack\\NDVI_gapfree.nc"
-    swi_path = "C:\\Users\\i.pfeil\\Desktop\\poets\\RAWDATA2\\SWI\\SWI_stack.nc"
+    # no stack data
+    #ndvi_path = "E:\\poets\\RAWDATA\\NDVI_8daily_500\\"
+    #swi_path = "E:\\poets\\RAWDATA\\SWI_daily_01\\"
     AG_LC = 'C:\\Users\\i.pfeil\\Desktop\\Isabella\\Peejush\\AG_Mask\\AG_LC_West_SA_0.1.nc'
     
-    paths = {'SWI': swi_path,'NDVI': ndvi_gapfree, 'AG_LC': AG_LC}
+    # stacked data
+    ndvi_path = "E:\\poets\\RAWDATA\\NDVI_stack\\NDVI_gapfree.nc"
+    swi_path = "E:\\poets\\RAWDATA\\SWI_daily_stack\\SWI_daily_stack.nc"
+    
+    paths = {'SWI': swi_path,'NDVI': ndvi_path, 'AG_LC': AG_LC}
 
     region = 'IN.MH.JN'
-    pred_date = datetime(2014,5,1)
+    #start_pred(paths, region, mode='pred') 
     
-    spatial_res = 0.1
-    start_pred(paths, region, pred_date, spatial_res=spatial_res) 
-    
-    calib = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\results2.npy')   
-    validate_prediction(calib, plotname=region+'_Prediction')
+    pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150805.npy')
+    pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150813.npy')
+    pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150821.npy')
+    pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150901.npy')   
+    validate_prediction(pred1, ndvi_path, plotname=region+'_Prediction')
+    validate_prediction(pred2, ndvi_path, plotname=region+'_Prediction')
+    validate_prediction(pred3, ndvi_path, plotname=region+'_Prediction')
+    validate_prediction(pred4, ndvi_path, plotname=region+'_Prediction')
     

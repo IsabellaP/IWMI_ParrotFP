@@ -59,14 +59,15 @@ def scatterplot(lons, lats, data, s=75, title=None, marker=',', discrete=True,
     
 def scatter_subplots(lons1, lats1, data1, s1,
                      lons2, lats2, data2, s2,
-                     plotname, title1=None, title2=None):
+                     plotname, llcrnrlat, urcrnrlat, llcrnrlon, urcrnrlon,
+                     vi_date):
     
     fig = plt.figure(figsize=[16,20])
     
     # first subplot
     ax1 = fig.add_subplot(121)
-    m = Basemap(projection='cyl', llcrnrlat=15.5, urcrnrlat=17,
-                    llcrnrlon=73, urcrnrlon=74.5)
+    m = Basemap(projection='cyl', llcrnrlat=llcrnrlat, urcrnrlat=urcrnrlat,
+                    llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon)
     m.drawcoastlines()
     m.drawcountries()
     
@@ -79,8 +80,7 @@ def scatter_subplots(lons1, lats1, data1, s1,
                                  '0_IWMI_DATASETS', 'shapefiles', 'IND_adm', 
                                  'IND_adm2'), 'IN.MH.JN')
     
-    if title1:
-        plt.title(title1)
+    plt.title(str(vi_date)+' - simulated')
         
     sc = m.scatter(lons1, lats1, c=data1, edgecolor='None', marker=',', 
                        s=s1, vmin=0, vmax=1, cmap='RdYlGn')
@@ -88,8 +88,8 @@ def scatter_subplots(lons1, lats1, data1, s1,
     
     # second subplot
     ax2 = fig.add_subplot(122, sharex=ax1, sharey=ax1)
-    m = Basemap(projection='cyl', llcrnrlat=15.5, urcrnrlat=17,
-                    llcrnrlon=73, urcrnrlon=74.5)
+    m = Basemap(projection='cyl', llcrnrlat=llcrnrlat, urcrnrlat=urcrnrlat,
+                    llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon)
     m.drawcoastlines()
     m.drawcountries()
     
@@ -102,14 +102,13 @@ def scatter_subplots(lons1, lats1, data1, s1,
                                  '0_IWMI_DATASETS', 'shapefiles', 'IND_adm', 
                                  'IND_adm2'), 'IN.MH.JN')
     
-    if title2:
-        plt.title(title2)
-        
+    plt.title(str(vi_date)+' - orig. data')
+
     sc = m.scatter(lons2, lats2, c=data2, edgecolor='None', marker=',', 
                        s=s2, vmin=0, vmax=1, cmap='RdYlGn')
     m.colorbar(sc, 'right', size='5%', pad='2%')
     
     #plt.show()
-    plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\correct\\'+
-                plotname+'.png', bbox_inches='tight')
+    plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\04_regional_plots\\'+
+                plotname+'_'+str(vi_date+'.png', bbox_inches='tight')
     
