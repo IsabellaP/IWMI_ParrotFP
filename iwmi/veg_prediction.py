@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import pytesmo.temporal_matching as temp_match
 from poets.shape.shapes import Shape
 
-from readers import read_ts, read_img, find_nearest, read_AG_LC
+from Basemap_scatterplot import scatter_subplots
 from data_analysis import rescale_peng
-from Basemap_scatterplot import scatter_subplots, scatterplot
+from readers import read_ts, read_img, find_nearest, read_AG_LC
 
 
 def validate_prediction(pred, vi_path, plotname):
@@ -67,7 +67,7 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
     lats = res_lats[np.where((res_lats>=lat_min) & (res_lats<=lat_max))]
     
     start_date = datetime(2011,1,1)
-    end_date = datetime(2015,07,31)
+    end_date = datetime(2015,8,31)
     
     results1 = []
     results2 = []
@@ -75,7 +75,7 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
     results4 = []
     for lon in lons:
         for lat in lats:
-            print lon, lat
+            #print lon, lat
             nearest_lon = find_nearest(lc_lons, lon)
             nearest_lat = find_nearest(lc_lats, lat)
             lon_idx = np.where(lc_lons==nearest_lon)[0]
@@ -123,8 +123,13 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
             
             if mode == 'calc_kd':
                 kd = calc_kd(swi, vi, matched_data)
-                np.save('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
-                        '01_kd_param\\'+str(lon)+'_'+str(lat)+'.npy', kd)
+                path = ('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                        '01_kd_param_'+str(end_date.year)+
+                        str(end_date.month).zfill(2)+
+                        str(end_date.day).zfill(2)+'\\')
+                if not os.path.exists(path):
+                    os.mkdir(path)
+                np.save(os.path.join(path, str(lon)+'_'+str(lat)+'.npy', kd))
             elif mode == 'pred':
                 kd = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
                              '01_kd_param\\'+str(lon)+'_'+str(lat)+'.npy').item()
@@ -280,13 +285,10 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
     # vi_sim is shifted 8 days compared to matched_data
     if len(new_idx) == 0:
         return results1, results2, results3, results4
-    if new_idx[-1].day == 21:
-        if new_idx[-1].month == 12:
+    # if last date is Dec. 27th, shift it to Jan 1st instead of adding 8 days
+    if new_idx[-1].day == 27 and new_idx[-1].month == 12:
             new_idx = new_idx.append(pd.Index([datetime(new_idx[-1].year+1, 
                                                         1, 1)]))
-        else:
-            new_idx = new_idx.append(pd.Index([datetime(new_idx[-1].year, 
-                                              new_idx[-1].month+1, 1)]))
     else:
         new_idx = new_idx.append(pd.Index([new_idx[-1]+timedelta(8)]))
     
@@ -306,18 +308,21 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
     ylabels = ax.get_yticklabels()
     plt.setp(ylabels, fontsize=20)
     plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
-                '03_plots_1508\\'+str(lon)+'_'+str(lat)+'.png', 
+                '03_plots_1509\\'+str(lon)+'_'+str(lat)+'.png', 
                 bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.clf()
     
     # scale back and consider data gaps
     vi = vi[vi_str]
-        
-    res = vi_sim[-1]*(vi_max - vi_min)/100 + vi_min
-    results1.append([lon, lat, res, new_idx[-4]])
-    results2.append([lon, lat, res, new_idx[-3]])
-    results3.append([lon, lat, res, new_idx[-2]])
-    results4.append([lon, lat, res, new_idx[-1]])
+    
+    res1 = vi_sim[-4]*(vi_max - vi_min)/100 + vi_min
+    res2 = vi_sim[-3]*(vi_max - vi_min)/100 + vi_min
+    res3 = vi_sim[-2]*(vi_max - vi_min)/100 + vi_min
+    res4 = vi_sim[-1]*(vi_max - vi_min)/100 + vi_min
+    results1.append([lon, lat, res1, new_idx[-4]])
+    results2.append([lon, lat, res2, new_idx[-3]])
+    results3.append([lon, lat, res3, new_idx[-2]])
+    results4.append([lon, lat, res4, new_idx[-1]])
 
     return results1, results2, results3, results4
 
@@ -336,8 +341,13 @@ if __name__ == '__main__':
     paths = {'SWI': swi_path,'NDVI': ndvi_path, 'AG_LC': AG_LC}
 
     region = 'IN.MH.JN'
-    #start_pred(paths, region, mode='pred') 
+    print datetime.now()
+    print 'Calculating kd...'
+    start_pred(paths, region, mode='calc_kd')
+    print 'Prediction...'
+    start_pred(paths, region, mode='pred') 
     
+    print 'Plot results...'
     pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150805.npy')
     pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150813.npy')
     pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150821.npy')
@@ -347,3 +357,4 @@ if __name__ == '__main__':
     validate_prediction(pred3, ndvi_path, plotname=region+'_Prediction')
     validate_prediction(pred4, ndvi_path, plotname=region+'_Prediction')
     
+    print 'done', datetime.now()
