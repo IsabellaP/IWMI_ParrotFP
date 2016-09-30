@@ -75,7 +75,7 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
     results4 = []
     for lon in lons:
         for lat in lats:
-            #print lon, lat
+            print lon, lat
             nearest_lon = find_nearest(lc_lons, lon)
             nearest_lat = find_nearest(lc_lats, lat)
             lon_idx = np.where(lc_lons==nearest_lon)[0]
@@ -119,9 +119,9 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
             # calculate differences between VIs of consecutive months
             dvi = np.ediff1d(vi, to_end=np.NaN)
             vi['D_VI'] = pd.Series(dvi, index=vi.index)
-            matched_data = temp_match.matching(swi, vi)
             
             if mode == 'calc_kd':
+                matched_data = temp_match.matching(swi, vi)
                 kd = calc_kd(swi, vi, matched_data)
                 path = ('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
                         '01_kd_param_'+str(end_date.year)+
@@ -129,10 +129,11 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
                         str(end_date.day).zfill(2)+'\\')
                 if not os.path.exists(path):
                     os.mkdir(path)
-                np.save(os.path.join(path, str(lon)+'_'+str(lat)+'.npy', kd))
+                np.save(os.path.join(path, str(lon)+'_'+str(lat)+'.npy'), kd)
             elif mode == 'pred':
                 kd = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
                              '01_kd_param\\'+str(lon)+'_'+str(lat)+'.npy').item()
+                matched_data = temp_match.matching(swi, vi[vi_str])
                 results1, results2, results3, results4 = predict_vegetation(lon, 
                                                         lat, swi, vi, 
                                                         matched_data, kd, 
@@ -225,7 +226,7 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
                        vi_all=None):
     
     vi_sim = []
-    for i in range(0,len(matched_data)):
+    for i in range(0,len(matched_data[1:])):
         try:
             k, d = kd[(matched_data.index[i].month,
                        matched_data.index[i].day)]
@@ -255,11 +256,26 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
     
     # calculate SWI climatology
     clim = swi[t_val].groupby([swi[t_val].index.month, 
-                               swi[t_val].index.day]).mean()
+                                   swi[t_val].index.day]).mean()
+    clim_reset = clim.reset_index()
+    idx_8d = []
+    for doy in range(len(clim_reset)):
+        month = clim_reset['level_0'].values[doy]
+        day = clim_reset['level_1'].values[doy]
+        if month == 2 and day == 29:
+            continue
+        idx_8d.append(datetime(2010,month,day))
+    clim_365 = clim.iloc[[count for count, _ in enumerate(clim) if count != 59]]
+    clim_swi_tmp = pd.DataFrame(clim_365.values, index=idx_8d, columns=[t_val],
+                                dtype=clim.dtype)
+    clim_swi_tmp = clim_swi_tmp.resample('8D').mean()
+    clim_swi = clim_swi_tmp[t_val].groupby([clim_swi_tmp[t_val].index.month, 
+                                            clim_swi_tmp[t_val].index.day]).mean()
     
     # predict further into future
     new_idx = matched_data.index[1:]
     new_timestamp = matched_data.index[-1]
+    
     for i in range(4):
         if new_timestamp.month == 12 and new_timestamp.day == 27:
             new_timestamp = datetime(new_timestamp.year+1, 1, 1)
@@ -277,20 +293,15 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
                                              new_timestamp.day))
             continue
         vi_prev = vi_sim[-1]
-        vi_sim1 = vi_prev + k*clim[new_timestamp.month, new_timestamp.day] + d
+        vi_sim1 = vi_prev + k*clim_swi[new_timestamp.month, 
+                                       new_timestamp.day] + d
         vi_sim.append(vi_sim1)
         new_idx = new_idx.append(pd.Series(index=[new_timestamp]).index)
     
     # plot results
     # vi_sim is shifted 8 days compared to matched_data
     if len(new_idx) == 0:
-        return results1, results2, results3, results4
-    # if last date is Dec. 27th, shift it to Jan 1st instead of adding 8 days
-    if new_idx[-1].day == 27 and new_idx[-1].month == 12:
-            new_idx = new_idx.append(pd.Index([datetime(new_idx[-1].year+1, 
-                                                        1, 1)]))
-    else:
-        new_idx = new_idx.append(pd.Index([new_idx[-1]+timedelta(8)]))
+        return results1, results2, results3, results4    
     
     df_sim = pd.DataFrame(vi_sim, columns=[vi_str+'_sim'], index=new_idx)
     
@@ -307,6 +318,7 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
     plt.setp(xlabels, rotation=45, fontsize=20)
     ylabels = ax.get_yticklabels()
     plt.setp(ylabels, fontsize=20)
+    
     plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
                 '03_plots_1509\\'+str(lon)+'_'+str(lat)+'.png', 
                 bbox_extra_artists=(lgd,), bbox_inches='tight')
@@ -341,17 +353,16 @@ if __name__ == '__main__':
     paths = {'SWI': swi_path,'NDVI': ndvi_path, 'AG_LC': AG_LC}
 
     region = 'IN.MH.JN'
-    print datetime.now()
-    print 'Calculating kd...'
-    start_pred(paths, region, mode='calc_kd')
-    print 'Prediction...'
+    #print 'Calculating kd...', datetime.now()
+    #start_pred(paths, region, mode='calc_kd')
+    print 'Prediction...', datetime.now()
     start_pred(paths, region, mode='pred') 
     
-    print 'Plot results...'
-    pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150805.npy')
-    pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150813.npy')
-    pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150821.npy')
-    pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150901.npy')   
+    print 'Plot results...', datetime.now()
+    pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150906.npy')
+    pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150914.npy')
+    pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150922.npy')
+    pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150930.npy')   
     validate_prediction(pred1, ndvi_path, plotname=region+'_Prediction')
     validate_prediction(pred2, ndvi_path, plotname=region+'_Prediction')
     validate_prediction(pred3, ndvi_path, plotname=region+'_Prediction')
