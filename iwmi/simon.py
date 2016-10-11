@@ -32,7 +32,14 @@ def init_0_1_grid(str):
             mask = (ncfile.variables["SWI_010"][:]).mask
         lons, lats = np.meshgrid(lon, lat)
         grid = BasicGrid(lons[np.where(mask == False)], lats[np.where(mask == False)])
-
+    elif str == 'IMD':
+        fpath = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\IMD_RF_stack.nc'
+        with Dataset(fpath, mode='r') as ncfile:
+            lon = ncfile.variables['lon'][:]
+            lat = ncfile.variables['lat'][:]
+            mask = (ncfile.variables["IMD_RF"][:]).mask
+        lons, lats = np.meshgrid(lon, lat)
+        grid = BasicGrid(lons.flatten(), lats.flatten())
     elif (str == 'NDVI') | (str == 'LAI'):
         fpath = "C:\\Users\\s.hochstoger\\Desktop\\poets\\DATA"
         fname = "West_SA_0.1_dekad_NDVI.nc"
@@ -145,21 +152,52 @@ def anomaly(df):
 
     return df_anomaly
 
+# def anomaly_std(df):
+#     '''
+#     Calculates anomalies for time series. Of each day mean value of
+#     this day over all years is subtracted.
+#     Parameters:
+#     -----------
+#     df : pd.DataFrame
+#         DataFrame
+#     Returns:
+#     --------
+#     data : pd.DataFrame
+#         Dataset containing anomalies of input DataFrame
+#     '''
+#     group = df.groupby([df.index.month, df.index.day])
+#     m = {}
+#     std = {}
+#     df_anomaly = df.copy()
+#     for key, _ in group:
+#         m[key] = group.get_group(key).mean()
+#         std[key] = group.get_group(key).std()
+#
+#     for i in range(0, len(df_anomaly)):
+#         val_m = m[(df_anomaly.index[i].month, df_anomaly.index[i].day)]
+#         val_std = std[(df_anomaly.index[i].month, df_anomaly.index[i].day)]
+#         df_anomaly.iloc[i] = (df_anomaly.iloc[i] - val_m)/val_std
+#
+#     col_str = df.columns[0] + ' Anomaly'
+#     df_anomaly.columns = [col_str]
+#
+#     return df_anomaly
 
 def plot_anomaly(df, df_anom):
     if df_anom.columns[0][0:3] == 'SWI':
-        df_anom = df_anom / 100
-        df = df / 100
-        ax = df_anom.plot.area(stacked=False, figsize=[20, 15], color='b')
+        df_anom = df_anom
+        df = df
+        ax = df_anom.plot.area(stacked=False, figsize=[30, 10], color='b')
         df.plot(ax=ax, color='b')
-        plt.title(df.columns[0] + ' and ' + df_anom.columns[0])
+        plt.title(df.columns[0] + ' and ' + df_anom.columns[0], fontsize=20)
+        plt.ylabel('Degree of Saturation [%]', fontsize=17)
     else:
         ax = df_anom.plot.area(stacked=False, figsize=[20, 15], color='g')
         df.plot(ax=ax, color='g')
         plt.title(df.columns[0] + ' and ' + df_anom.columns[0])
     plt.grid()
     plt.axhline(0, color='black')
-    plt.ylim([-0.5, 1])
+    plt.ylim([-50, 100])
 
 
 def plot_area(lon_min, lon_max, lat_min, lat_max):
@@ -468,7 +506,7 @@ def create_drought_dist(lat_min, lat_max, lon_min, lon_max):
     columns = ['healthy', 'watch', 'drought']
     df = pd.DataFrame([], index=[-999], columns=columns)
     for date in all_dates:
-        data, _, _ = read_img(path, 'IDSI', lat_min, lat_max, lon_min, lon_max, timestamp=date)
+        data, _, _, _ = read_img(path, 'IDSI', lat_min, lat_max, lon_min, lon_max, timestamp=date)
         drought = np.where((data[0] == 1) | (data[0] == 2) | (data[0] == 3))[0].size
         watch = np.where((data[0] == 4) | (data[0] == 5))[0].size
         healthy = np.where((data[0] == 6) | (data[0] == 7))[0].size
@@ -527,13 +565,30 @@ def calc_corr_IDSI_SWI(lat_min, lat_max, lon_min, lon_max):
         print s_rho, s_p
 
 
+def calc_IMD_10(rf):
+    years = [2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015]
+    months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    df = pd.DataFrame()
+    for year in years:
+        ind_y = np.where(rf.index.year == year)
+        df_year = rf.iloc[ind_y[0]]
+        for month in months:
+            ind_m = np.where(df_year.index.month == month)
+            df_month = df_year.iloc[ind_m[0]]
+            df_new = df_month.resample('10d').mean()
+            if df_new.size == 4:
+                df_new = df_new.iloc[:3]
+            df = df.append(df_new)
+
+    return df
+
 if __name__ == '__main__':
     swi_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc"
     # #df_swi = read_ts_area(swi_path, 'SWI_040', 19.204, 21, 74, 76.5754)
-    df_swi1 = read_ts(swi_path, params=['SWI_001'], lon=80.6948, lat=7.2903,
-            start_date=datetime(2007, 7, 1), end_date=datetime(2016, 5, 31))
-    df_swi2 = read_ts(swi_path, params=['SWI_001'], lon=80.4687, lat=8.1135,
-            start_date=datetime(2007, 7, 1), end_date=datetime(2016, 5, 31))
+    # df_swi1 = read_ts(swi_path, params=['SWI_001'], lon=80.6948, lat=7.2903,
+    #         start_date=datetime(2007, 7, 1), end_date=datetime(2016, 5, 31))
+    # df_swi2 = read_ts(swi_path, params=['SWI_001'], lon=80.4687, lat=8.1135,
+    #         start_date=datetime(2007, 7, 1), end_date=datetime(2016, 5, 31))
     # anomaly_swi = anomaly(df_swi)
     # df_anom = anomaly_swi/100
     #
@@ -574,6 +629,27 @@ if __name__ == '__main__':
     # =========================================
 
     # ====== RAINFALL ===============
+
+    # test, lons1, lats1 = init_0_1_grid('IMD')
+    # map = Basemap(projection='cyl', llcrnrlon=65, llcrnrlat=10, urcrnrlat=30,
+    #               urcrnrlon=85)
+    # map.readshapefile(os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
+    #                                '0_IWMI_DATASETS', 'shapefiles', 'IND_adm',
+    #                                'IND_adm1'), 'IN.MH.JN')
+    # x1, y1 = map(lons1.flatten(), lats1.flatten())
+    # map.plot(x1, y1, 's', color='b', mec='b', markersize=3.5)
+    # x2, y2 = map(lons2.flatten(), lats2.flatten())
+    # map.plot(x2, y2, 'o', color='r', mec='b', markersize=2.5)
+
+
+
+    # rf = read_ts_area(imd_path, 'IMD_RF', 19.204, 21, 74, 76.5754)
+    # df = calc_IMD_10(rf)
+    # anom = anomaly(df)
+    # anom2 = anomaly(rf)
+
+
+
     # sm = read_ts_area('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc', 'SWI_001',
     #                   21.38, 22.30, 70, 72)
     #

@@ -7,6 +7,8 @@ from pygrids.warp5 import DGGv21CPv20
 from rsdata.WARP.interface import WARP
 from warp_data.interface import init_grid
 import matplotlib.pyplot as plt
+import ast
+import ConfigParser
 
 
 def read_foxy_finn(ssm_path):
@@ -222,5 +224,13 @@ def find_nearest(array, element):
     idx = (np.abs(array - element)).argmin()
     return array[idx]
 
+def read_cfg(config_file):
+    # reading from config file
+    configParser = ConfigParser.RawConfigParser()
+    configFilePath = config_file
+    configParser.read(configFilePath)
+    cfg = {}
+    for item, value in configParser.defaults().iteritems():
+        cfg[item] = value
 
-pass
+    return cfg

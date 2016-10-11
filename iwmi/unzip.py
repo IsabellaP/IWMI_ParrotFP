@@ -24,13 +24,13 @@ def format_to_folder(root, formatstr, out_path):
     """ Looks for files of format formatstr in all subfolders of root and copies
     the files to out_path
     """
-    
+
     for path, _, files in os.walk(root):
         for name in files:
             if formatstr in name:
-                shutil.copyfile(os.path.join(path, name), 
+                shutil.copyfile(os.path.join(path, name),
                                 os.path.join(out_path, name))
-                
+
 
 def merge_nc(path, new_path, new_ncf, variables, datestr):
 
@@ -95,17 +95,17 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
                 data_single = {}
                 for var in variables:
                     data_single[var] = ncfile_single.variables[var][:]
-                    data[var][idx,:,:] = data_single[var]
+                    data[var][idx, :, :] = data_single[var]
 
             year = int(ncf[datestr['year'][0]:datestr['year'][1]])
             month = int(ncf[datestr['month'][0]:datestr['month'][1]])
             day = int(ncf[datestr['day'][0]:datestr['day'][1]])
-            numdate = date2num(datetime(year,month,day), units=times.units,
+            numdate = date2num(datetime(year, month, day), units=times.units,
                                calendar=times.calendar)
             times[idx] = numdate     
         
     print 'Finished.'
-    
+
     
 def read_tiff(srcpath, fname, coord_alt=False):
     
@@ -237,10 +237,13 @@ def rename_files():
 
 
 if __name__ == '__main__':
-       
-    path = "E:\\poets\\RAWDATA\\NDVI\\"
-    new_path = "E:\\poets\\RAWDATA\\"
-    datestr = {'year': (5,9), 'month': (9,11), 'day': (11,13)} # NDVI gapfree
-    merge_tiff(path, new_path, 'NDVI_stack.nc', 'NDVI', datestr)
+
+    path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\TEST_FOR_SOFTWARE\\SWI\\"
+    new_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\TEST_FOR_SOFTWARE\\SWI\\"
+    unzip(path, new_path)
+
+
+    datestr = {'year': (4,8), 'month': (9,11), 'day': (12,14)} # NDVI gapfree
+    merge_tiff(path, new_path, 'IMD_RF_stack.nc', 'IMD_RF', datestr)
     
     print "done"

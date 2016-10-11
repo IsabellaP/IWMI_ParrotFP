@@ -405,6 +405,13 @@ if __name__ == '__main__':
     # read Sri Lanka gpis
     #gpi_path = "C:\\Users\\i.pfeil\\Desktop\\Isabella\\pointlist_Sri Lanka_warp.csv"
     #gpis_df = pd.read_csv(gpi_path)
+    swi_daily_path = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI_daily"
+    mahail = read_tss(swi_daily_path, param='SWI', lon=80.468046, lat=8.110454, gpi=None,
+                      start_date=datetime(2016, 9, 3), end_date=datetime(2016, 10, 3),
+                      plot_ts=False, swi_param='SWI_001')
+    kundasale = read_tss(swi_daily_path, param='SWI', lon=80.694805, lat=7.290307, gpi=None,
+                      start_date=datetime(2016, 9, 3), end_date=datetime(2016, 10, 3),
+                      plot_ts=False, swi_param='SWI_001')
 
     # set paths to datasets
     ssm_path = "C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\ssm\\foxy_finn\\R1A\\"
