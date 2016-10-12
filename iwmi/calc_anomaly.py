@@ -26,4 +26,5 @@ lat_min, lat_max, lon_min, lon_max = get_lonlat_district(district)
 swi = read_ts_area(input_path, t_value, lat_min, lat_max, lon_min, lon_max)
 swi_anom = anomaly(swi)
 plot_anomaly(swi, swi_anom)
-plt.show()
+plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\plots_for_paper\\MH_JN_anom.png',
+                dpi=250, bbox_inches='tight', pad_inches=0.3)

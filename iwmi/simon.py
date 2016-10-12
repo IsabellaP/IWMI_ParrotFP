@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import pytesmo.temporal_matching as temp_match
 import pytesmo.metrics as metrics
 
-
 def init_0_1_grid(str):
     '''
     Parameters:
@@ -54,6 +53,18 @@ def init_0_1_grid(str):
         grid = BasicGrid(lons[np.where(mask == False)], lats[np.where(mask == False)])
 
     return grid
+
+def get_SWI_grid_mask(lat_min, lat_max, lon_min, lon_max):
+    fpath = "C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWI\\20070701"
+    fname = "g2_BIOPAR_SWI10_200707010000_GLOBE_ASCAT_V3_0_1.nc"
+    with Dataset(os.path.join(fpath, fname), mode='r') as ncfile:
+        lon = ncfile.variables['lon'][:]
+        lat = ncfile.variables['lat'][:]
+        lat_idx = np.where((lat >= lat_min) & (lat <= lat_max))[0]
+        lon_idx = np.where((lon >= lon_min) & (lon <= lon_max))[0]
+        mask = (ncfile.variables["SWI_010"][lat_idx, lon_idx]).mask
+
+    return mask
 
 def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
     '''

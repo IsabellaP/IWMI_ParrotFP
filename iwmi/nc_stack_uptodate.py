@@ -11,7 +11,7 @@ def array_to_raster(array, lon, lat, dst_filename):
     x_pixels = array.shape[1]  # number of pixels in x
     y_pixels = array.shape[0] # number of pixels in y
     PIXEL_SIZE = 0.1  # size of the pixel...
-    x_min = lon.min()- PIXEL_SIZE/2
+    x_min = lon.min() - PIXEL_SIZE/2
     y_max = lat.max() + PIXEL_SIZE/2 # x_min & y_max are like the "top left" corner.
 
     driver = gdal.GetDriverByName('GTiff')
@@ -24,6 +24,7 @@ def array_to_raster(array, lon, lat, dst_filename):
     srs.ImportFromEPSG(4326)
     dataset.SetProjection(srs.ExportToWkt())
     dataset.GetRasterBand(1).WriteArray(array)
+    dataset.GetRasterBand(1).SetNoDataValue(-99)
     dataset.FlushCache()  # Write to disk.
     return dataset, dataset.GetRasterBand(1)
 
