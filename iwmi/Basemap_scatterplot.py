@@ -110,5 +110,6 @@ def scatter_subplots(lons1, lats1, data1, s1,
     
     #plt.show()
     plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\04_regional_plots\\'+
-                plotname+'_'+str(vi_date.year)+str(vi_date.month).zfill(2)+
-                str(vi_date.day).zfill(2)+'.png', bbox_inches='tight')
+                 plotname+'_'+str(vi_date.year)+str(vi_date.month).zfill(2)+
+                 str(vi_date.day).zfill(2)+'.png', bbox_inches='tight')
+     

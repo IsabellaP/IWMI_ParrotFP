@@ -46,7 +46,8 @@ def init_0_1_grid(str):
 
     return grid
 
-def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
+def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1,
+                 poets=False):
     '''
     Reads all pixel of given area and returns the mean value per day
     for this area.
@@ -81,7 +82,10 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
             param = 'SWI_' + str(t).zfill(3)
         mean = []
         dates = []
+        start_day = datetime(2007,1,1)
         for day in all_dates:
+            if day < start_day: 
+                continue
             nearest_date = find_nearest(all_dates, day)
             date_idx = np.where(all_dates == nearest_date)[0]
 
@@ -91,11 +95,16 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1):
             lon_idx = np.where((lons >= lon_min) & (lons <= lon_max))[0]
             data = ncfile.variables[param][date_idx, lat_idx, lon_idx]
             data[data < 0] = 0
+            if poets:
+                data = np.ma.masked_where(((data.data == -99)|(data.data==0)), data)
 
             if np.ma.is_masked(data):
-                mean_value = data.data[np.where(data.data != 255)].mean()
+                #mean_value = data.data[np.where(data.data != 255)].mean()
+                mean_value = data.mean()
             else:
                 mean_value = data.mean()
+            if np.ma.is_masked(mean_value):
+                continue
             mean.append(mean_value)
             dates.append(day)
             # if day.day == 24:

@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from scipy import signal as sg
 from datetime import datetime, timedelta
 from netCDF4 import Dataset
 import matplotlib.pyplot as plt
@@ -10,12 +11,13 @@ from poets.shape.shapes import Shape
 from Basemap_scatterplot import scatter_subplots
 from data_analysis import rescale_peng
 from readers import read_ts, read_img, find_nearest, read_AG_LC
+from simon import read_ts_area
 
 
 def validate_prediction(pred, vi_path, plotname):
 
-    lons = pred[:,0]
-    lats = pred[:,1]
+    lons = np.around(pred[:,0].astype(np.double),2)
+    lats = np.around(pred[:,1].astype(np.double),2)
     data = pred[:,2]
     timestamp = np.unique(pred[:,3])[0]
     
@@ -28,26 +30,139 @@ def validate_prediction(pred, vi_path, plotname):
     lon_min, lat_min, lon_max, lat_max = shpfile.bbox
     
     vi_ts = datetime(timestamp.year, timestamp.month, timestamp.day)
-    vi_data, vi_lons, vi_lats, vi_date = read_img(vi_path, param='NDVI', 
+    vi_data, vi_lons, vi_lats, _ = read_img(vi_path, param='NDVI', 
                                                   lat_min=lat_min, lat_max=lat_max,
                                                   lon_min=lon_min, lon_max=lon_max, 
                                                   timestamp=vi_ts)
 
+    vi_data = vi_data[0,:,:]
     vi_data = np.ma.masked_where(vi_data<0, vi_data)
 
     vi_lon, vi_lat = np.meshgrid(vi_lons, vi_lats)
     vi_lon = vi_lon.flatten()
     vi_lat = vi_lat.flatten()
     
-    scatter_subplots(lons, lats, data, 250, 
-                     vi_lon, vi_lat, vi_data, 1, plotname,
-                     llcrnrlat=lat_min-0.5, urcrnrlat=lat_max+0.5,
-                     llcrnrlon=lon_min-0.5, urcrnrlon=lon_max+0.5,
-                     vi_date=vi_date)
+    #print data.min(), data.max(), data.mean(), data.std()
+    #print vi_data.min(), vi_data.max(), vi_data.mean(), vi_data.std()
     
+    # reshape data to 2D array
+    latsize = len(np.unique(lats))
+    lonsize = len(np.unique(lons))
+    data_reshape = np.zeros((latsize, lonsize)) - 99
+    lat_mesh, lon_mesh = np.meshgrid(np.unique(lats)[::-1], np.unique(lons))
+    for i in range(len(lons)):
+        lon_idx, lat_idx = np.where((lat_mesh == lats[i])&(lon_mesh == lons[i]))
+        if len(lat_idx) == 0 or len(lon_idx) == 0:
+            continue
+        data_reshape[lat_idx, lon_idx] = data[i]
+    data_pred = np.ma.masked_where(data_reshape==-99, data_reshape)
+     
+    #corr(data_pred, vi_data, vi_date)
+    
+    #===========================================================================
+    # scatter_subplots(lons, lats, data, 350, 
+    #                  vi_lon, vi_lat, vi_data, 1, plotname,
+    #                  llcrnrlat=lat_min-0.5, urcrnrlat=lat_max+0.5,
+    #                  llcrnrlon=lon_min-0.5, urcrnrlon=lon_max+0.5,
+    #                  vi_date=vi_date)
+    #===========================================================================
+     
     return pred
 
-def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
+
+def pred_mean_ts(pred1, pred2, pred3, pred4, plotname):
+    
+    data1 = pred1[:,2].mean()
+    timestamp1 = np.unique(pred1[:,3])[0]
+    data2 = pred2[:,2].mean()
+    timestamp2 = np.unique(pred2[:,3])[0]
+    data3 = pred3[:,2].mean()
+    timestamp3 = np.unique(pred3[:,3])[0]
+    data4 = pred4[:,2].mean()
+    timestamp4 = np.unique(pred4[:,3])[0]
+    
+    data = np.array([data1, data2, data3, data4])
+    timestamp = np.array([timestamp1, timestamp2, timestamp3, timestamp4])
+    
+    pred_df = pd.DataFrame(data, columns=['pred_mean'], index=[timestamp])
+    
+    # districts
+    shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Documents', 
+                             '0_IWMI_DATASETS', 'shapefiles', 'IND_adm', 
+                             'IND_adm2')
+    region = plotname[:8]
+    print region
+    shpfile = Shape(region, shapefile=shapefile)
+    lon_min, lat_min, lon_max, lat_max = shpfile.bbox
+    
+    # ndvi gapfree 500m
+    vi_path = "E:\\poets\\RAWDATA\\NDVI_stack\\NDVI_gapfree.nc"
+    vi_all = read_ts_area(vi_path, param='NDVI', 
+                         lat_min=lat_min, 
+                         lat_max=lat_max, 
+                         lon_min=lon_min, 
+                         lon_max=lon_max)
+    
+    vi_all = vi_all['2013':'2015']
+    idx = np.where(vi_all['NDVI'] != 0)[0]
+    vi_data = vi_all.values[idx]
+    vi_index = vi_all.index[idx]
+    
+    gapfree_df = pd.DataFrame(data=vi_data, columns=['NDVI_mean_gapfree'], index=[vi_index])
+    
+    ax = gapfree_df.plot()
+    pred_df.plot(ax=ax)
+    plt.title(plotname, fontsize=22)
+    plt.grid()
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    #plt.show()
+    plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\06_analysis\\'+plotname+
+                '.png', bbox_inches='tight')
+    plt.close()
+    
+    print 'done'
+
+
+def corr(i01, i02, vi_date):
+    # from http://stackoverflow.com/questions/189943/how-can-i-quantify-difference-between-two-images
+    
+    i1 = i01.data
+    i1[np.where(i01.mask == True)] = np.NAN
+    i2 = i02.data
+    i2[np.where(i02.mask == True)] = np.NAN
+    
+    #===========================================================================
+    # print i1
+    # print np.nansum(i1), np.nanmean(i1), np.nanstd(i1)
+    # print i2
+    # print np.nansum(i2), np.nanmean(i2), np.nanstd(i2)
+    #===========================================================================
+    
+    notnan_size = i1.size-np.where(np.isnan(i1-i2))[0].size
+    
+    dist_euclidean = np.sqrt(np.nansum((i1 - i2)**2))/notnan_size
+
+    dist_manhattan = np.nansum(abs(i1 - i2)) / notnan_size
+
+    dist_ncc = (np.nansum((i1 - np.nanmean(i1)) * (i2 - np.nanmean(i2))) / 
+                ((notnan_size - 1) * np.nanstd(i1) * np.nanstd(i2)))
+    
+    absdiff = abs(i1 - i2)
+    
+    print 'dist_euclidean, dist_manhattan, dist_ncc:'
+    print dist_euclidean, dist_manhattan, dist_ncc
+    
+    #===========================================================================
+    # plt.matshow(absdiff)
+    # plt.colorbar()
+    # plt.show()
+    # #plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\05_stats\\'+
+    # #            'absdiff_'+str(vi_date.year)+str(vi_date.month).zfill(2)+
+    # #            str(vi_date.day).zfill(2)+'.png', bbox_inches='tight')
+    #===========================================================================
+
+
+def start_pred(paths, region, end_date, vi_str='NDVI', t_val='SWI_040',
                mode='calc_kd'):
     
     with Dataset(paths['SWI'], 'r') as ncfile:
@@ -66,8 +181,7 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
     lons = res_lons[np.where((res_lons>=lon_min) & (res_lons<=lon_max))]
     lats = res_lats[np.where((res_lats>=lat_min) & (res_lats<=lat_max))]
     
-    start_date = datetime(2011,1,1)
-    end_date = datetime(2015,8,31)
+    start_date = datetime(2007,1,1)
     
     results1 = []
     results2 = []
@@ -92,9 +206,13 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
             swi_list = [t_val]
             swi_df, _, _ = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
                                    start_date=start_date, end_date=end_date)
-            vi_all, _, _ = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
-                                   start_date=start_date, end_date=datetime.today())
-            vi_df = vi_all[:end_date]
+            vi_all = read_ts_area(vi_path, vi_str, lat_min=nearest_lat-0.04, 
+                                  lat_max=nearest_lat+0.04, 
+                                  lon_min=nearest_lon-0.04, 
+                                  lon_max=nearest_lon+0.04)
+            #vi_all, _, _ = read_ts(vi_path, lon=lon, lat=lat, params=vi_str, 
+            #                       start_date=start_date, end_date=datetime.today())
+            vi_df = vi_all[start_date:end_date]
             vi_all = rescale_peng(vi_all, np.nanmin(vi_all), np.nanmax(vi_all))
             
             # consider leap years
@@ -126,13 +244,19 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
                 path = ('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
                         '01_kd_param_'+str(end_date.year)+
                         str(end_date.month).zfill(2)+
-                        str(end_date.day).zfill(2)+'\\')
+                        str(end_date.day).zfill(2)+'_'+region[-2:]+'\\')
                 if not os.path.exists(path):
                     os.mkdir(path)
                 np.save(os.path.join(path, str(lon)+'_'+str(lat)+'.npy'), kd)
             elif mode == 'pred':
-                kd = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
-                             '01_kd_param\\'+str(lon)+'_'+str(lat)+'.npy').item()
+                try:
+                    kd = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
+                             '01_kd_param_'+str(end_date.year)+
+                        str(end_date.month).zfill(2)+
+                        str(end_date.day).zfill(2)+'_'+region[-2:]+'\\'+str(lon)+'_'+str(lat)+'.npy').item()
+                except IOError:
+                    print 'No kd file'
+                    continue
                 matched_data = temp_match.matching(swi, vi[vi_str])
                 results1, results2, results3, results4 = predict_vegetation(lon, 
                                                         lat, swi, vi, 
@@ -142,7 +266,9 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
                                                         results2=results2,
                                                         results3=results3,
                                                         results4=results4,
-                                                        vi_all=vi_all)
+                                                        vi_all=vi_all,
+                                                        region=region,
+                                                        end_date=end_date)
     
     if mode == 'pred':
         ts1 = np.unique(np.array(results1)[:,3])[0]
@@ -168,7 +294,7 @@ def start_pred(paths, region, vi_str='NDVI', t_val='SWI_040',
 
 
 def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI', 
-             plot_fig=False):
+            plot_fig=False):
     
     """ Simulate VI from SWI as in Zribi et al., 2010.
     
@@ -197,7 +323,7 @@ def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI',
     """
 
     # calculate parameters k and d based on data until 2015
-    sim_end = '2015'
+    sim_end = '2014'
     
     grouped_data = matched_data[:sim_end].groupby([matched_data[:sim_end].index.month, 
                                                    matched_data[:sim_end].index.day])
@@ -223,7 +349,8 @@ def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI',
 def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max, 
                        t_val='SWI_040', vi_str='NDVI', plot_fig=False, 
                        results1=[], results2=[], results3=[], results4=[],
-                       vi_all=None):
+                       vi_all=None, region='IN.MH.JN', 
+                       end_date=datetime(2015,8,31)):
     
     vi_sim = []
     for i in range(0,len(matched_data[1:])):
@@ -292,7 +419,10 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
             print 'no k, d values for '+str((new_timestamp.month,
                                              new_timestamp.day))
             continue
-        vi_prev = vi_sim[-1]
+        if i == 0: # letzten NDVI wert nehmen, nicht letzten vi_sim!
+            vi_prev = vi[vi_str][-1]
+        else:
+            vi_prev = vi_sim[-1]
         vi_sim1 = vi_prev + k*clim_swi[new_timestamp.month, 
                                        new_timestamp.day] + d
         vi_sim.append(vi_sim1)
@@ -319,10 +449,13 @@ def predict_vegetation(lon, lat, swi, vi, matched_data, kd, vi_min, vi_max,
     ylabels = ax.get_yticklabels()
     plt.setp(ylabels, fontsize=20)
     
-    plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
-                '03_plots_1509\\'+str(lon)+'_'+str(lat)+'.png', 
+    plotname = str(end_date.year-2000)+str(end_date.month).zfill(2)+'_'+region[-2:]
+    save_path = 'C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\03_plots_'+plotname
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    plt.savefig(os.path.join(save_path, str(lon)+'_'+str(lat)+'.png'), 
                 bbox_extra_artists=(lgd,), bbox_inches='tight')
-    plt.clf()
+    plt.close()
     
     # scale back and consider data gaps
     vi = vi[vi_str]
@@ -352,20 +485,59 @@ if __name__ == '__main__':
     
     paths = {'SWI': swi_path,'NDVI': ndvi_path, 'AG_LC': AG_LC}
 
-    region = 'IN.MH.JN'
-    #print 'Calculating kd...', datetime.now()
-    #start_pred(paths, region, mode='calc_kd')
-    print 'Prediction...', datetime.now()
-    start_pred(paths, region, mode='pred') 
+    regions = ['IN.MH.JN']
+    end_dates = [datetime(2013,5,31), datetime(2015,7,31), datetime(2015,8,31)]
     
-    print 'Plot results...', datetime.now()
-    pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150906.npy')
-    pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150914.npy')
-    pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150922.npy')
-    pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\IN.MH.JN_20150930.npy')   
-    validate_prediction(pred1, ndvi_path, plotname=region+'_Prediction')
-    validate_prediction(pred2, ndvi_path, plotname=region+'_Prediction')
-    validate_prediction(pred3, ndvi_path, plotname=region+'_Prediction')
-    validate_prediction(pred4, ndvi_path, plotname=region+'_Prediction')
+    
+    #print 'Calculating kd...', datetime.now()
+    #start_pred(paths, region, mode='calc_kd') 
+    
+    #print 'Plot results...', datetime.now()
+    # plot: set vmin vmax accordingly
+    
+    for region in regions:
+        #=======================================================================
+        # pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130602.npy')
+        # pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130610.npy')
+        # pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130618.npy')
+        # pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130626.npy')
+        # #pred_mean_ts(pred1, pred2, pred3, pred4, plotname=plotname)
+        #=======================================================================
+         
+        pred5 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150805.npy')
+        pred6 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150813.npy')
+        pred7 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150821.npy')
+        pred8 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150829.npy')
+        #pred_mean_ts(pred5, pred6, pred7, pred8, plotname=region+'_201508')
+         
+        pred9 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150906.npy')
+        pred10 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150914.npy')
+        pred11 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150922.npy')
+        pred12 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150930.npy')
+        #pred_mean_ts(pred9, pred10, pred11, pred12, plotname=region+'_201509')
+         
+        #=======================================================================
+        # plotname = region+'_201306'
+        # print plotname
+        # validate_prediction(pred1, ndvi_path, plotname=plotname+'02')
+        # validate_prediction(pred2, ndvi_path, plotname=plotname+'10')
+        # validate_prediction(pred3, ndvi_path, plotname=plotname+'18')
+        # validate_prediction(pred4, ndvi_path, plotname=plotname+'26')
+        #=======================================================================
+         
+        plotname = region+'_201508'
+        print plotname
+        validate_prediction(pred5, ndvi_path, plotname=plotname+'05')
+        validate_prediction(pred6, ndvi_path, plotname=plotname+'13')
+        validate_prediction(pred7, ndvi_path, plotname=plotname+'21')
+        validate_prediction(pred8, ndvi_path, plotname=plotname+'29')
+         
+        plotname = region+'_201509'
+        print plotname
+        validate_prediction(pred9, ndvi_path, plotname=plotname+'06')
+        validate_prediction(pred10, ndvi_path, plotname=plotname+'14')
+        validate_prediction(pred11, ndvi_path, plotname=plotname+'22')
+        validate_prediction(pred12, ndvi_path, plotname=plotname+'30')
+    
     
     print 'done', datetime.now()

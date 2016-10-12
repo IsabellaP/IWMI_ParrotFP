@@ -98,7 +98,10 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
             with Dataset(os.path.join(path, ncf), 'r') as ncfile_single:
                 data_single = {}
                 for var in variables:
-                    data_single[var] = ncfile_single.variables[var][:]
+                    if idx >= 1461:
+                        data_single[var] = ncfile_single.variables[var][:-1,:]
+                    else:
+                        data_single[var] = ncfile_single.variables[var][:]
                     data[var][idx,:,:] = data_single[var]
 
             year = int(ncf[datestr['year'][0]:datestr['year'][1]])
@@ -243,13 +246,18 @@ def rename_files():
 if __name__ == '__main__':
        
     path = "E:\\_DATA\\SWI_daily\\"
+    path_uz = "E:\\_DATA\\SWI_daily_unzipped\\"
+    #unzip(path, path_uz)
+    
     new_path = "E:\\_DATA\\"
     format_path = "E:\\_DATA\\SWI_daily_nc\\"
+    #format_to_folder(path_uz, '.nc', format_path)
+        
     new_ncf = 'SWI_daily_stack.nc'
     variables = ['SWI_001', 'SWI_005', 'SWI_010', 'SWI_015', 
                  'SWI_020', 'SWI_040', 'SWI_060', 'SWI_100']  
     datestr = {'year': [14,18], 'month': [18,20], 'day': [20,22]}
-    
+      
     merge_nc(format_path, new_path, new_ncf, variables, datestr)
     
     print "done"
