@@ -12,6 +12,7 @@ from Basemap_scatterplot import scatter_subplots
 from data_analysis import rescale_peng
 from readers import read_ts, read_img, find_nearest, read_AG_LC
 from simon import read_ts_area
+from nc_stack_uptodate import array_to_raster
 
 
 def validate_prediction(pred, vi_path, plotname):
@@ -30,7 +31,7 @@ def validate_prediction(pred, vi_path, plotname):
     lon_min, lat_min, lon_max, lat_max = shpfile.bbox
     
     vi_ts = datetime(timestamp.year, timestamp.month, timestamp.day)
-    vi_data, vi_lons, vi_lats, _ = read_img(vi_path, param='NDVI', 
+    vi_data, vi_lons, vi_lats, vi_date = read_img(vi_path, param='NDVI_8daily_500_dataset', 
                                                   lat_min=lat_min, lat_max=lat_max,
                                                   lon_min=lon_min, lon_max=lon_max, 
                                                   timestamp=vi_ts)
@@ -55,9 +56,15 @@ def validate_prediction(pred, vi_path, plotname):
         if len(lat_idx) == 0 or len(lon_idx) == 0:
             continue
         data_reshape[lat_idx, lon_idx] = data[i]
-    data_pred = np.ma.masked_where(data_reshape==-99, data_reshape)
+    data_reshape=data_reshape[:,:-2]
+    data_masked = np.ma.masked_where(vi_data.mask==True, data_reshape)
+    data_pred = np.ma.masked_where(data_masked==-99, data_masked)
+    
+    #savepath = 'C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\07_geotiffs\\'
+    #array_to_raster(data_pred, lon_mesh[:,0], lat_mesh[0], 
+    #                savepath+plotname+'.tiff')
      
-    #corr(data_pred, vi_data, vi_date)
+    corr(data_pred, vi_data, vi_date)
     
     #===========================================================================
     # scatter_subplots(lons, lats, data, 350, 
@@ -485,7 +492,7 @@ if __name__ == '__main__':
     
     paths = {'SWI': swi_path,'NDVI': ndvi_path, 'AG_LC': AG_LC}
 
-    regions = ['IN.MH.JN']
+    regions = ['IN.RJ.BP']
     end_dates = [datetime(2013,5,31), datetime(2015,7,31), datetime(2015,8,31)]
     
     
@@ -496,13 +503,13 @@ if __name__ == '__main__':
     # plot: set vmin vmax accordingly
     
     for region in regions:
-        #=======================================================================
-        # pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130602.npy')
-        # pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130610.npy')
-        # pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130618.npy')
-        # pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130626.npy')
-        # #pred_mean_ts(pred1, pred2, pred3, pred4, plotname=plotname)
-        #=======================================================================
+        ndvi_path = 'E:\\poets\\DATA\\'+region+'_0.1_daily.nc'
+        
+        pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130602.npy')
+        pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130610.npy')
+        pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130618.npy')
+        pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130626.npy')
+        #pred_mean_ts(pred1, pred2, pred3, pred4, plotname=plotname)
          
         pred5 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150805.npy')
         pred6 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150813.npy')
@@ -516,14 +523,12 @@ if __name__ == '__main__':
         pred12 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150930.npy')
         #pred_mean_ts(pred9, pred10, pred11, pred12, plotname=region+'_201509')
          
-        #=======================================================================
-        # plotname = region+'_201306'
-        # print plotname
-        # validate_prediction(pred1, ndvi_path, plotname=plotname+'02')
-        # validate_prediction(pred2, ndvi_path, plotname=plotname+'10')
-        # validate_prediction(pred3, ndvi_path, plotname=plotname+'18')
-        # validate_prediction(pred4, ndvi_path, plotname=plotname+'26')
-        #=======================================================================
+        plotname = region+'_201306'
+        print plotname
+        validate_prediction(pred1, ndvi_path, plotname=plotname+'02')
+        validate_prediction(pred2, ndvi_path, plotname=plotname+'10')
+        validate_prediction(pred3, ndvi_path, plotname=plotname+'18')
+        validate_prediction(pred4, ndvi_path, plotname=plotname+'26')
          
         plotname = region+'_201508'
         print plotname

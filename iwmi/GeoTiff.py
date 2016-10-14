@@ -4,14 +4,15 @@ import datetime
 years = [2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015]
 
 def change_date_str(year, jd):
-    doy = jd*8-7
+    #doy = jd*8-7
+    doy = jd
     date = datetime.datetime(year, 1, 1) + datetime.timedelta(doy - 1)
     date = date.strftime("%Y_%m_%d")
     return date
 
 for year in years:
-    src_filename = 'H:\\MODIS_VCI\\vci_' + str(year) + '.tif'
 
+    src_filename = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\IMD_rainfall\\IMD\\IMD_Daily_' + str(year) + '.tif'
     # Opens source dataset
     src_ds = gdal.Open(src_filename)
     format = "GTiff"
@@ -24,7 +25,8 @@ for year in years:
         i += 1
         date = change_date_str(year, i)
         print date
-        dst_filename = 'H:\\MODIS_VCI\\GTiffs\\VCI_' + date + '.tif'
+        dst_filename = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Rainfall\\IMD\\IMD_' + date + '.tif'
+
         band = src_ds.GetRasterBand(i)
         nodatavalue = band.GetNoDataValue()
         arr = band.ReadAsArray()
