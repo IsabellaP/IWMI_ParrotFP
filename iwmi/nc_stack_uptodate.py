@@ -69,7 +69,8 @@ def check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, variable
                         data_single = {}
                         for var in variables:
                             data_single[var] = ncfile_single.variables[var][:]
-                            ncfile[var][nc_all_dates.size+idx, :, :] = \
+                            ncfile[var][nc_all_dates.size+idx, 
+                                        :data_single[var].shape[0], :] = \
                                         data_single[var]
 
                     numdate = date2num(dates_to_append[idx], units=unit_temps, calendar=cal_temps)
