@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import calendar
-from netCDF4 import Dataset
+from netCDF4 import Dataset, num2date
 import matplotlib.pyplot as plt
 import pytesmo.temporal_matching as temp_match
 from poets.shape.shapes import Shape
@@ -43,34 +43,54 @@ def start_pred(paths, region, shp_path, results_path,
         Last full year for which data is available
     """
     
+    # get bounding box for district
+    shpfile = Shape(region, shapefile=shp_path)
+    lon_min, lat_min, lon_max, lat_max = shpfile.bbox
+    start_date = datetime(2007,1,1)
+    
     # get lons and lats
     with Dataset(paths['SWI'], 'r') as ncfile:
         res_lons = ncfile.variables['lon'][:]
         res_lats = ncfile.variables['lat'][:]
-    
-    # get bounding box for district
-    shpfile = Shape(region, shapefile=shp_path)
-    lon_min, lat_min, lon_max, lat_max = shpfile.bbox
-    lons = res_lons[np.where((res_lons>=lon_min) & (res_lons<=lon_max))]
-    lats = res_lats[np.where((res_lats>=lat_min) & (res_lats<=lat_max))]
-    
-    start_date = datetime(2007,1,1)
+        lons_idx = np.where((res_lons>=lon_min) & (res_lons<=lon_max))[0]
+        lats_idx = np.where((res_lats>=lat_min) & (res_lats<=lat_max))[0]
+        lons = res_lons[lons_idx]
+        lats = res_lats[lats_idx]
+        
+        # date period
+        unit_temps = ncfile.variables['time'].units
+        nctime = ncfile.variables['time'][:]
+        try:
+            cal_temps = ncfile.variables['time'].calendar
+        except AttributeError:  # Attribute doesn't exist
+            cal_temps = u"gregorian"  # or standard
+        
+        all_dates = num2date(nctime, units=unit_temps, calendar=cal_temps)
+        date_idx = np.where((all_dates >= start_date) &
+                            (all_dates <= end_date))[0]
+
+        swi_data = ncfile.variables[t_val][date_idx, lats_idx, lons_idx]
      
     results1 = []
     results2 = []
     results3 = []
     results4 = []
+    i = 0
     for lon in lons:
         for lat in lats:
-            print lon, lat
-                 
-            swi_path = paths['SWI']
+            i += 1
+            if i % (len(lats)*len(lons)/20) == 0:
+                print str(i/(len(lats)*len(lons)/20.) * 100/20) + '%'
+                
             vi_path = paths[vi_str]
              
             # read SWI data
-            swi_list = [t_val]
-            swi_df, _, _ = read_ts(swi_path, lon=lon, lat=lat, params=swi_list, 
-                                   start_date=start_date, end_date=end_date)
+            lon_idx = np.where(lons == lon)[0]
+            lat_idx = np.where(lats == lat)[0]
+            swi_single = swi_data[:, lat_idx, lon_idx]
+            swi_df = pd.DataFrame(swi_single, index=all_dates[date_idx],
+                                  columns=[t_val])
+            
             swi_df.values[np.where(swi_df.values == 255)] = np.NAN
              
             # read VI-data for 0.1 degree area
@@ -78,7 +98,6 @@ def start_pred(paths, region, shp_path, results_path,
                                   lat_min=lat-0.05, lat_max=lat+0.05, 
                                   lon_min=lon-0.05, lon_max=lon+0.05)
             vi_df = vi_all[start_date:end_date]
-            vi_all = rescale_minmax(vi_all, np.nanmin(vi_all), np.nanmax(vi_all))
              
             # consider leap years
             leap_years = np.where((vi_df.index.year%4 == 0) & 
@@ -109,21 +128,22 @@ def start_pred(paths, region, shp_path, results_path,
             if not os.path.exists(kd_path):
                 os.mkdir(kd_path)
             if not os.path.exists(kd_path+'\\'+str(lon)+'_'+str(lat)+'.npy'):
-                print 'Calculate kd...'
+                #print 'Calculate kd...'
                 matched_data = temp_match.matching(swi, vi)
                 kd = calc_kd(swi, vi, matched_data, sim_end=sim_end)
                 np.save(os.path.join(kd_path, str(lon)+'_'+str(lat)+'.npy'), kd)
             else:
-                print 'kd already exist.'
+                pass
+                #print 'kd already exist.'
              
             # predict VI values
             try:
                 kd = np.load(results_path+ '01_kd_param_'+sim_end+'_'+
                              region[-2:]+'\\'+str(lon)+'_'+str(lat)+'.npy').item()
             except IOError:
-                print 'No kd file'
+                #print 'No kd file'
                 continue
-            print 'Predict...'
+            #print 'Predict...'
             matched_data = temp_match.matching(swi, vi[vi_str])
             results1, results2, results3, results4 = predict_vegetation(lon, 
                                                     lat, swi, vi, kd, 
@@ -206,7 +226,7 @@ def mean_ts(pred1, pred2, pred3, pred4, lon_min, lat_min, lon_max, lat_max,
                          lon_min=lon_min, 
                          lon_max=lon_max)
     
-    vi_all = vi_all['2013':]
+    vi_all = vi_all['2013':timestamp1]
     idx = np.where(vi_all['NDVI'] != 0)[0]
     vi_data = vi_all.values[idx]
     vi_index = vi_all.index[idx]
@@ -472,6 +492,8 @@ def add_months(sourcedate, months):
 
 if __name__ == '__main__':
     
+    print datetime.now()
+    
     # get settings from cfg-file
     cfg = read_cfg('config_file_daily.cfg')
 
@@ -483,12 +505,17 @@ if __name__ == '__main__':
     str_date = cfg['end_date']
     end_date = datetime.strptime(str_date, '%Y-%m-%d')
     
+    if not os.path.exists(results_path):
+        os.mkdir(results_path)
+    
     paths = {'SWI': swi_path,'NDVI': vi_path}
 
     # start prediction
     check_path = os.path.join(results_path, '03_plots_'+str(end_date.year-2000)+
                               str(end_date.month).zfill(2)+
                               str(end_date.day).zfill(2)+'_'+region[-2:])
+    print 'Writing results to '+results_path
+    print 'Delete folder 03_plots_ if not fully processed!'
     if not os.path.exists(check_path):
         print 'Start prediction for '+region+', '+str(end_date)
         start_pred(paths, region, shp_path, results_path, end_date=end_date,
@@ -504,4 +531,6 @@ if __name__ == '__main__':
             print 'save '+plotname
             pred = np.load(os.path.join(results_path,'02_results',result))
             save_results(pred, plotname, savepath)
+            
+    print datetime.now()
     
