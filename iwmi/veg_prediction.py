@@ -247,14 +247,14 @@ def start_pred(paths, region, end_date, vi_str='NDVI', t_val='SWI_040',
             
             if mode == 'calc_kd':
                 matched_data = temp_match.matching(swi, vi)
-                kd = calc_kd(swi, vi, matched_data)
+                kd = calc_kd(swi, vi, matched_data, plot_fig=True, lon=lon, lat=lat)
                 path = ('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
                         '01_kd_param_'+str(end_date.year)+
                         str(end_date.month).zfill(2)+
                         str(end_date.day).zfill(2)+'_'+region[-2:]+'\\')
-                if not os.path.exists(path):
-                    os.mkdir(path)
-                np.save(os.path.join(path, str(lon)+'_'+str(lat)+'.npy'), kd)
+                #if not os.path.exists(path):
+                #    os.mkdir(path)
+                #np.save(os.path.join(path, str(lon)+'_'+str(lat)+'.npy'), kd)
             elif mode == 'pred':
                 try:
                     kd = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\'+
@@ -301,7 +301,7 @@ def start_pred(paths, region, end_date, vi_str='NDVI', t_val='SWI_040',
 
 
 def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI', 
-            plot_fig=False):
+            plot_fig=False, lon=75.65, lat=20.55):
     
     """ Simulate VI from SWI as in Zribi et al., 2010.
     
@@ -330,7 +330,7 @@ def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI',
     """
 
     # calculate parameters k and d based on data until 2015
-    sim_end = '2014'
+    sim_end = '2010'
     
     grouped_data = matched_data[:sim_end].groupby([matched_data[:sim_end].index.month, 
                                                    matched_data[:sim_end].index.day])
@@ -348,7 +348,9 @@ def calc_kd(swi, vi, matched_data, t_val='SWI_040', vi_str='NDVI',
                       '*x + '+str(round(d, 3)))
             plt.xlabel(t_val)
             plt.ylabel('D_VI')
-            plt.show()
+            plotname = 'C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\09_report\\kd_'+str(key)+'_'+str(lon)+'_'+str(lat)+'.png'
+            plt.savefig(plotname)
+            plt.close()
             
     return kd
             
@@ -492,57 +494,59 @@ if __name__ == '__main__':
     
     paths = {'SWI': swi_path,'NDVI': ndvi_path, 'AG_LC': AG_LC}
 
-    regions = ['IN.RJ.BP']
+    region = 'IN.MH.JN'
     end_dates = [datetime(2013,5,31), datetime(2015,7,31), datetime(2015,8,31)]
     
     
-    #print 'Calculating kd...', datetime.now()
-    #start_pred(paths, region, mode='calc_kd') 
+    print 'Calculating kd...', datetime.now()
+    start_pred(paths, region, end_date=datetime(2010,12,31), mode='calc_kd') 
     
     #print 'Plot results...', datetime.now()
     # plot: set vmin vmax accordingly
     
-    for region in regions:
-        ndvi_path = 'E:\\poets\\DATA\\'+region+'_0.1_daily.nc'
-        
-        pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130602.npy')
-        pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130610.npy')
-        pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130618.npy')
-        pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130626.npy')
-        #pred_mean_ts(pred1, pred2, pred3, pred4, plotname=plotname)
-         
-        pred5 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150805.npy')
-        pred6 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150813.npy')
-        pred7 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150821.npy')
-        pred8 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150829.npy')
-        #pred_mean_ts(pred5, pred6, pred7, pred8, plotname=region+'_201508')
-         
-        pred9 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150906.npy')
-        pred10 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150914.npy')
-        pred11 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150922.npy')
-        pred12 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150930.npy')
-        #pred_mean_ts(pred9, pred10, pred11, pred12, plotname=region+'_201509')
-         
-        plotname = region+'_201306'
-        print plotname
-        validate_prediction(pred1, ndvi_path, plotname=plotname+'02')
-        validate_prediction(pred2, ndvi_path, plotname=plotname+'10')
-        validate_prediction(pred3, ndvi_path, plotname=plotname+'18')
-        validate_prediction(pred4, ndvi_path, plotname=plotname+'26')
-         
-        plotname = region+'_201508'
-        print plotname
-        validate_prediction(pred5, ndvi_path, plotname=plotname+'05')
-        validate_prediction(pred6, ndvi_path, plotname=plotname+'13')
-        validate_prediction(pred7, ndvi_path, plotname=plotname+'21')
-        validate_prediction(pred8, ndvi_path, plotname=plotname+'29')
-         
-        plotname = region+'_201509'
-        print plotname
-        validate_prediction(pred9, ndvi_path, plotname=plotname+'06')
-        validate_prediction(pred10, ndvi_path, plotname=plotname+'14')
-        validate_prediction(pred11, ndvi_path, plotname=plotname+'22')
-        validate_prediction(pred12, ndvi_path, plotname=plotname+'30')
+    #===========================================================================
+    # for region in regions:
+    #     ndvi_path = 'E:\\poets\\DATA\\'+region+'_0.1_daily.nc'
+    #     
+    #     pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130602.npy')
+    #     pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130610.npy')
+    #     pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130618.npy')
+    #     pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130626.npy')
+    #     #pred_mean_ts(pred1, pred2, pred3, pred4, plotname=plotname)
+    #      
+    #     pred5 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150805.npy')
+    #     pred6 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150813.npy')
+    #     pred7 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150821.npy')
+    #     pred8 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150829.npy')
+    #     #pred_mean_ts(pred5, pred6, pred7, pred8, plotname=region+'_201508')
+    #      
+    #     pred9 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150906.npy')
+    #     pred10 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150914.npy')
+    #     pred11 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150922.npy')
+    #     pred12 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150930.npy')
+    #     #pred_mean_ts(pred9, pred10, pred11, pred12, plotname=region+'_201509')
+    #      
+    #     plotname = region+'_201306'
+    #     print plotname
+    #     validate_prediction(pred1, ndvi_path, plotname=plotname+'02')
+    #     validate_prediction(pred2, ndvi_path, plotname=plotname+'10')
+    #     validate_prediction(pred3, ndvi_path, plotname=plotname+'18')
+    #     validate_prediction(pred4, ndvi_path, plotname=plotname+'26')
+    #      
+    #     plotname = region+'_201508'
+    #     print plotname
+    #     validate_prediction(pred5, ndvi_path, plotname=plotname+'05')
+    #     validate_prediction(pred6, ndvi_path, plotname=plotname+'13')
+    #     validate_prediction(pred7, ndvi_path, plotname=plotname+'21')
+    #     validate_prediction(pred8, ndvi_path, plotname=plotname+'29')
+    #      
+    #     plotname = region+'_201509'
+    #     print plotname
+    #     validate_prediction(pred9, ndvi_path, plotname=plotname+'06')
+    #     validate_prediction(pred10, ndvi_path, plotname=plotname+'14')
+    #     validate_prediction(pred11, ndvi_path, plotname=plotname+'22')
+    #     validate_prediction(pred12, ndvi_path, plotname=plotname+'30')
+    #===========================================================================
     
     
     print 'done', datetime.now()

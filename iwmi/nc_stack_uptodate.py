@@ -104,17 +104,17 @@ def check_tiff_stack(data_path, data_path_tif, stack_path, stack_name, variables
             nc_all_dates = num2date(nctime, units=unit_temps, calendar=cal_temps)
             nc_all_dates_str = [datetime.strftime(date, "%Y%m%d") for date in nc_all_dates]
             folder_all_dates = os.listdir(data_path)
+            folder_all_dates_str = [date[datestr['year'][0]:datestr['day'][1]] for date in folder_all_dates]
             s = set(nc_all_dates_str)
-            dates_to_append_str = [x for x in folder_all_dates if x not in s]
+            dates_to_append_str = [x for x in folder_all_dates_str if x not in s]
             dates_to_append = [datetime.strptime(date, "%Y%m%d") for date in dates_to_append_str]
 
             if dates_to_append:
                 print 'Append new data to stack'
-                for idx, date_folder in enumerate(dates_to_append_str):
-                    path_to_tif = os.path.join(data_path, date_folder)
-                    nc_date = os.listdir(path_to_tif)[0]
-                    print date_folder
-                    data_single, _, _ = read_tiff(path_to_tif, date_folder)
+                for idx, date_str in enumerate(dates_to_append_str):
+                    tif_name = 'NDVI_'+date_str+'.tif'
+                    print tif_name
+                    data_single = read_tiff(data_path, tif_name, lonlat=False)
                     ncfile[variables][nc_all_dates.size+idx, :, :] = data_single
 
                     numdate = date2num(dates_to_append[idx], units=unit_temps, calendar=cal_temps)

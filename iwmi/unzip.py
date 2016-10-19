@@ -114,7 +114,7 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
     print 'Finished.'
     
     
-def read_tiff(srcpath, fname, coord_alt=False):
+def read_tiff(srcpath, fname, coord_alt=False, lonlat=False):
     
     src_filename = os.path.join(srcpath, fname)
 
@@ -124,32 +124,35 @@ def read_tiff(srcpath, fname, coord_alt=False):
     arr = band.ReadAsArray()
     latsize, lonsize = arr.shape
     
-    if not coord_alt: # falsche coord!
-        # unravel GDAL affine transform parameters
-        c, a, b, f, d, e = src_ds.GetGeoTransform()
+    if lonlat:
+        if not coord_alt: # falsche coord!
+            # unravel GDAL affine transform parameters
+            c, a, b, f, d, e = src_ds.GetGeoTransform()
+            
+            col = np.arange(lonsize)
+            row = np.arange(latsize)
+            col_grid, row_grid = np.meshgrid(col, row)
+            
+            lons = a * col_grid + b * row_grid + a * 0.5 + b * 0.5 + c
+            lats = d * col_grid + e * row_grid + d * 0.5 + e * 0.5 + f
+        else:
+            width = src_ds.RasterXSize
+            height = src_ds.RasterYSize
+            gt = src_ds.GetGeoTransform()
+            minx = gt[0]
+            miny = gt[3] + width*gt[4] + height*gt[5] 
+            maxx = gt[0] + width*gt[1] + height*gt[2]
+            maxy = gt[3]
+            
+            px = (maxx-minx)/lonsize
+            py = (maxy-miny)/latsize
+            
+            lons = np.arange(minx, maxx, px)
+            lats = np.arange(miny, maxy, py)
         
-        col = np.arange(lonsize)
-        row = np.arange(latsize)
-        col_grid, row_grid = np.meshgrid(col, row)
-        
-        lons = a * col_grid + b * row_grid + a * 0.5 + b * 0.5 + c
-        lats = d * col_grid + e * row_grid + d * 0.5 + e * 0.5 + f
+        return arr, lons, lats
     else:
-        width = src_ds.RasterXSize
-        height = src_ds.RasterYSize
-        gt = src_ds.GetGeoTransform()
-        minx = gt[0]
-        miny = gt[3] + width*gt[4] + height*gt[5] 
-        maxx = gt[0] + width*gt[1] + height*gt[2]
-        maxy = gt[3]
-        
-        px = (maxx-minx)/lonsize
-        py = (maxy-miny)/latsize
-        
-        lons = np.arange(minx, maxx, px)
-        lats = np.arange(miny, maxy, py)
-        
-    return arr, lons, lats
+        return arr
 
 
 def merge_tiff(path, new_path, new_tiff, variable, datestr):

@@ -1,3 +1,4 @@
+import ast
 import ConfigParser
 from nc_stack_uptodate import check_stack, check_tiff_stack
 
@@ -23,7 +24,7 @@ if __name__ == '__main__':
     nc_stack_path = cfg['swi_path']
     swi_stack_name = cfg['swi_stack_name']
     variables = cfg['swi_variables']
-    datestr = cfg['swi_datestr']
+    datestr = ast.literal_eval(cfg['swi_datestr'])
     
     check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
                 variables, datestr)
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     nc_stack_path = cfg['vi_path']
     swi_stack_name = cfg['vi_stack_name']
     variables = cfg['vi_variables']
-    datestr = cfg['vi_datestr']
+    datestr = ast.literal_eval(cfg['vi_datestr'])
     
     check_tiff_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
                      variables, datestr)
