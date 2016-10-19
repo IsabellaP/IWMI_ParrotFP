@@ -10,7 +10,7 @@ from poets.shape.shapes import Shape
 
 from veg_pred_readers import read_ts_area
 from nc_stack_uptodate import array_to_raster
-from veg_pred_preprocessing import read_cfg
+from veg_pred_preprocessing import read_cfg, unzip
 import ast
 from nc_stack_uptodate import check_stack, check_tiff_stack
 
@@ -507,6 +507,9 @@ if __name__ == '__main__':
     cfg = read_cfg('config_file_daily.cfg')
     
     # check nc-stack availability
+    swi_zippath = cfg['swi_zippath']
+    data_path = cfg['swi_rawdata']
+    unzip(swi_zippath, data_path)
     data_path = cfg['swi_rawdata']
     data_path_nc = cfg['swi_path_nc']
     nc_stack_path = cfg['swi_path']
