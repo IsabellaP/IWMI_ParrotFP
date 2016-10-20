@@ -1,12 +1,7 @@
-import os
 import numpy as np
 import pandas as pd
-import gdal
 from netCDF4 import Dataset, num2date
 from datetime import datetime
-from pygrids.warp5 import DGGv21CPv20
-from rsdata.WARP.interface import WARP
-from warp_data.interface import init_grid
 
 
 def read_ts(path, params=['SWI_020'], lon=80.5, lat=6.81,

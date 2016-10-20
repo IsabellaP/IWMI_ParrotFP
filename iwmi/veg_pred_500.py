@@ -3,17 +3,19 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import calendar
-from netCDF4 import Dataset, num2date, date2num
+from netCDF4 import Dataset, num2date
 import matplotlib.pyplot as plt
 import pytesmo.temporal_matching as temp_match
 from poets.shape.shapes import Shape
 
 from veg_pred_readers import read_ts, read_ts_area
 from nc_stack_uptodate import array_to_raster
-from veg_pred_preprocessing import read_cfg
+from veg_pred_preprocessing import read_cfg, unzip
+import ast
+from nc_stack_uptodate import check_stack, check_tiff_stack
 
 
-def start_pred(paths, region, shp_path, results_path,
+def start_pred(paths, region, cfg, results_path,
 			   end_date=datetime.today(), vi_str='NDVI', t_val='SWI_040',
 			   last_year=2015):
 	"""
@@ -28,8 +30,8 @@ def start_pred(paths, region, shp_path, results_path,
 		Paths to VI and SWI datasets (datasets as stacks)
 	region : str
 		Region as str, as in provided shapefile, e.g. 'IN.MH.JN' (Jalna)
-	shp_path : str
-		Path to shapefile
+ 	cfg : dict
+        Settings from cfg-file
 	results_path : str
 		Path where all results are saved
 	end_date : datetime, optional
@@ -42,11 +44,18 @@ def start_pred(paths, region, shp_path, results_path,
 	last_year : int
 		Last full year for which data is available
 	"""
-	start_date = datetime(2007,1,1)
+	shp_path = cfg['shp_path']
+	if shp_path == 'None':
+		latlon = cfg['latlon'].split()
+		lat_min = float(latlon[0])
+		lat_max = float(latlon[1])
+		lon_min = float(latlon[2])
+		lon_max = float(latlon[3])
+	else:
+		shpfile = Shape(region, shapefile=shp_path)
+		lon_min, lat_min, lon_max, lat_max = shpfile.bbox
 	
-	# get bounding box for district
-	shpfile = Shape(region, shapefile=shp_path)
-	lon_min, lat_min, lon_max, lat_max = shpfile.bbox
+	start_date = datetime(2007,1,1)
 	
 	# get lons and lats   
 	with Dataset(paths['NDVI'], 'r') as ncfile:
@@ -493,32 +502,60 @@ def add_months(sourcedate, months):
 
 if __name__ == '__main__':
 
-	print datetime.now()
-
+	print 'Process started: '+str(datetime.now())
+	
 	# get settings from cfg-file
 	cfg = read_cfg('config_file_daily.cfg')
-
+	
+	# check nc-stack availability, unzip files if necessary
+	swi_zippath = cfg['swi_zippath']
+	data_path = cfg['swi_rawdata']
+	unzip(swi_zippath, data_path)
+	
+	data_path = cfg['swi_rawdata']
+	data_path_nc = cfg['swi_path_nc']
+	nc_stack_path = cfg['swi_path']
+	swi_stack_name = cfg['swi_stack_name']
+	variables = cfg['swi_variables'].split()
+	datestr = ast.literal_eval(cfg['swi_datestr'])
+	
+	check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
+	            variables, datestr)
+	
+	# check and update VI stack
+	data_path = cfg['vi_rawdata']
+	data_path_nc = cfg['vi_path_nc']
+	nc_stack_path = cfg['vi_path']
+	swi_stack_name = cfg['vi_stack_name']
+	variables = cfg['vi_variables']
+	datestr = ast.literal_eval(cfg['vi_datestr'])
+	
+	check_tiff_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
+	                 variables, datestr)
+	
+	# start vegetation prediction
 	swi_path = cfg['swi_path'] + cfg['swi_stack_name']
 	vi_path = cfg['vi_path'] + cfg['vi_stack_name']
-	shp_path = cfg['shp_path']
 	results_path = cfg['results_path']
 	region = cfg['region']
 	str_date = cfg['end_date']
 	end_date = datetime.strptime(str_date, '%Y-%m-%d')
 	
-	paths = {'SWI': swi_path,'NDVI': vi_path}
-	
 	if not os.path.exists(results_path):
 		os.mkdir(results_path)
 	
+	paths = {'SWI': swi_path,'NDVI': vi_path}
+	
 	# start prediction
 	check_path = os.path.join(results_path, '03_plots_'+str(end_date.year-2000)+
-							  str(end_date.month).zfill(2)+
-							  str(end_date.day).zfill(2)+'_'+region[-2:])
+	                          str(end_date.month).zfill(2)+
+	                          str(end_date.day).zfill(2)+'_'+region)
+	print 'Writing results to '+results_path
+	print 'Delete folder 03_plots_'+region+' if not fully processed!'
 	if not os.path.exists(check_path):
 		print 'Start prediction for '+region+', '+str(end_date)
-		start_pred(paths, region, shp_path, results_path, end_date=end_date,
-				   last_year=(end_date+timedelta(8)).year-1)
+		start_pred(paths, region, cfg, results_path, end_date=end_date,
+	               last_year=(end_date+timedelta(8)).year-1)
 	
 	# save results
 	savepath = os.path.join(results_path, '04_geotiffs')
@@ -530,5 +567,5 @@ if __name__ == '__main__':
 			print 'save '+plotname
 			pred = np.load(os.path.join(results_path,'02_results',result))
 			save_results(pred, plotname, savepath)
-	
-	print datetime.now()
+
+	print 'Process finished: '+str(datetime.now())

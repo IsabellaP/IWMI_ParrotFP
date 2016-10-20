@@ -1,9 +1,10 @@
-from unzip import merge_nc, format_to_folder, merge_tiff, read_tiff
+import os
 import shutil
+from osgeo import gdal, osr
 from datetime import datetime
 from netCDF4 import Dataset, num2date, date2num
-import os
-from osgeo import gdal, osr
+from veg_pred_preprocessing import merge_nc, format_to_folder, merge_tiff, read_tiff
+
 
 def array_to_raster(array, lon, lat, dst_filename):
 
@@ -28,12 +29,13 @@ def array_to_raster(array, lon, lat, dst_filename):
     dataset.FlushCache()  # Write to disk.
     return dataset, dataset.GetRasterBand(1)
 
+
 # checks if stack exists, if False, stack will be created
 # if stack already exists, it checks if the stack is up to date with the files in data_path
 # if not up to date, the new files are appended to the existing stack
 def check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, variables, datestr):
 
-    print "Check if data stack is up to date"
+    print "Check if nc data stack is up to date"
     if os.path.isfile(os.path.join(nc_stack_path, swi_stack_name)) == False:
         print "Create new netcdf stack of data"
         if not os.path.exists(data_path_nc):
@@ -83,7 +85,7 @@ def check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, variable
 def check_tiff_stack(data_path, data_path_tif, stack_path, stack_name, variables, 
                      datestr):
     
-    print "Check if data stack is up to date"
+    print "Check if tif data stack is up to date"
     if os.path.isfile(os.path.join(stack_path, stack_name)) == False:
         print "Create new tiff stack of data"
         if not os.path.exists(data_path_tif):

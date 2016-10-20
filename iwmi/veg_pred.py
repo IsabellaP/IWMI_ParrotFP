@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+import ast
 import calendar
+from datetime import datetime, timedelta
 from netCDF4 import Dataset, num2date
 import matplotlib.pyplot as plt
 import pytesmo.temporal_matching as temp_match
@@ -11,7 +12,6 @@ from poets.shape.shapes import Shape
 from veg_pred_readers import read_ts_area
 from nc_stack_uptodate import array_to_raster
 from veg_pred_preprocessing import read_cfg, unzip
-import ast
 from nc_stack_uptodate import check_stack, check_tiff_stack
 
 

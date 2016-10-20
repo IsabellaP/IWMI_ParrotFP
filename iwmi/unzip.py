@@ -232,18 +232,6 @@ def merge_tiff(path, new_path, new_tiff, variable, datestr):
     print 'Finished.'
 
 
-def rename_files():
-    
-    path = 'E:\\_DATA\\NDVI_2001-15_gapfree\\WGS84\\'
-    fnames = os.listdir(path)
-    
-    for f in fnames:
-        print f, datetime.now()
-        year = f[5:9]
-        doy = f[10:13]
-        date = datetime(int(year), 1, 1) + timedelta(int(doy) - 1)
-        f_new = 'NDVI_'+str(year)+str(date.month).zfill(2)+str(date.day).zfill(2)+'.tif'
-        os.rename(os.path.join(path, f), os.path.join(path, f_new))
 
 
 if __name__ == '__main__':
