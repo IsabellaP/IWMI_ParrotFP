@@ -30,7 +30,7 @@ def start_pred(paths, region, cfg, results_path,
         Paths to VI and SWI datasets (datasets as stacks)
     region : str
         Region as str, as in provided shapefile, e.g. 'IN.MH.JN' (Jalna)
-    cfg : str
+    cfg : dict
         Settings from cfg-file
     results_path : str
         Path where all results are saved
@@ -489,7 +489,18 @@ def rescale_minmax(data, data_min, data_max):
 
 def add_months(sourcedate, months):
     """
-    Returns next month for given date.
+    Adds a specified number of months to a given date.
+    
+    Parameters:
+    -----------
+    sourcedate : datetime
+        Date
+    months : int
+        Number of months that should be added
+        
+    Returns:
+    --------
+    Date after months addition
     """
     
     month = sourcedate.month - 1 + months
@@ -501,15 +512,16 @@ def add_months(sourcedate, months):
 
 if __name__ == '__main__':
     
-    print datetime.now()
+    print 'Process started: '+str(datetime.now())
     
     # get settings from cfg-file
     cfg = read_cfg('config_file_daily.cfg')
     
-    # check nc-stack availability
+    # check nc-stack availability, unzip files if necessary
     swi_zippath = cfg['swi_zippath']
     data_path = cfg['swi_rawdata']
     unzip(swi_zippath, data_path)
+    
     data_path = cfg['swi_rawdata']
     data_path_nc = cfg['swi_path_nc']
     nc_stack_path = cfg['swi_path']
@@ -566,5 +578,5 @@ if __name__ == '__main__':
             pred = np.load(os.path.join(results_path,'02_results',result))
             save_results(pred, plotname, savepath)
             
-    print datetime.now()
+    print 'Process finished: '+str(datetime.now())
     
