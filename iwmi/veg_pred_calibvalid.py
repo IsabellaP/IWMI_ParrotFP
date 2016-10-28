@@ -77,7 +77,9 @@ def validate_prediction(pred, vi_path, plotname):
     return pred
 
 
-def pred_mean_ts(pred1, pred2, pred3, pred4, plotname):
+def pred_mean_all(pred1, pred2, pred3, pred4, 
+                  pred5, pred6, pred7, pred8,
+                  pred9, pred10, pred11, pred12, plotname):
     
     data1 = pred1[:,2].mean()
     timestamp1 = np.unique(pred1[:,3])[0]
@@ -86,12 +88,32 @@ def pred_mean_ts(pred1, pred2, pred3, pred4, plotname):
     data3 = pred3[:,2].mean()
     timestamp3 = np.unique(pred3[:,3])[0]
     data4 = pred4[:,2].mean()
-    timestamp4 = np.unique(pred4[:,3])[0]
+    timestamp4 = np.unique(pred4[:,3])[0]    
+    data5 = pred5[:,2].mean()
+    timestamp5 = np.unique(pred5[:,3])[0]
+    data6 = pred6[:,2].mean()
+    timestamp6 = np.unique(pred6[:,3])[0]
+    data7 = pred7[:,2].mean()
+    timestamp7 = np.unique(pred7[:,3])[0]
+    data8 = pred8[:,2].mean()
+    timestamp8 = np.unique(pred8[:,3])[0]
+    data9 = pred9[:,2].mean()
+    timestamp9 = np.unique(pred9[:,3])[0]
+    data10 = pred10[:,2].mean()
+    timestamp10 = np.unique(pred10[:,3])[0]
+    data11 = pred11[:,2].mean()
+    timestamp11 = np.unique(pred11[:,3])[0]
+    data12 = pred12[:,2].mean()
+    timestamp12 = np.unique(pred12[:,3])[0]
     
-    data = np.array([data1, data2, data3, data4])
-    timestamp = np.array([timestamp1, timestamp2, timestamp3, timestamp4])
+    data = np.array([data1, data2, data3, data4, data5, data6, data7, data8,
+                     data9, data10, data11, data12])
+    timestamp = np.array([timestamp1, timestamp2, timestamp3, timestamp4,
+                          timestamp5, timestamp6, timestamp7, timestamp8,
+                          timestamp9, timestamp10, timestamp11, timestamp12])
     
     pred_df = pd.DataFrame(data, columns=['pred_mean'], index=[timestamp])
+    print pred_df
     
     # districts
     shapefile = os.path.join('C:\\', 'Users', 'i.pfeil', 'Documents', 
@@ -116,15 +138,17 @@ def pred_mean_ts(pred1, pred2, pred3, pred4, plotname):
     vi_index = vi_all.index[idx]
     
     gapfree_df = pd.DataFrame(data=vi_data, columns=['NDVI_mean_gapfree'], index=[vi_index])
+    pd.set_option('display.max_rows', None)
+    print gapfree_df
     
     ax = gapfree_df.plot()
     pred_df.plot(ax=ax)
     plt.title(plotname, fontsize=22)
     plt.grid()
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    #plt.show()
-    plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\06_analysis\\'+plotname+
-                '.png', bbox_inches='tight')
+    plt.show()
+    #plt.savefig('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\06_analysis\\'+plotname+
+    #            '.png', bbox_inches='tight')
     plt.close()
     
     print 'done'
@@ -494,59 +518,62 @@ if __name__ == '__main__':
     
     paths = {'SWI': swi_path,'NDVI': ndvi_path, 'AG_LC': AG_LC}
 
-    region = 'IN.MH.JN'
+    regions = ['IN.MH.JN']
     end_dates = [datetime(2013,5,31), datetime(2015,7,31), datetime(2015,8,31)]
     
     
-    print 'Calculating kd...', datetime.now()
-    start_pred(paths, region, end_date=datetime(2010,12,31), mode='calc_kd') 
+    #print 'Calculating kd...', datetime.now()
+    #start_pred(paths, region, end_date=datetime(2010,12,31), mode='calc_kd') 
     
     #print 'Plot results...', datetime.now()
     # plot: set vmin vmax accordingly
     
-    #===========================================================================
-    # for region in regions:
-    #     ndvi_path = 'E:\\poets\\DATA\\'+region+'_0.1_daily.nc'
-    #     
-    #     pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130602.npy')
-    #     pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130610.npy')
-    #     pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130618.npy')
-    #     pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130626.npy')
-    #     #pred_mean_ts(pred1, pred2, pred3, pred4, plotname=plotname)
-    #      
-    #     pred5 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150805.npy')
-    #     pred6 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150813.npy')
-    #     pred7 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150821.npy')
-    #     pred8 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150829.npy')
-    #     #pred_mean_ts(pred5, pred6, pred7, pred8, plotname=region+'_201508')
-    #      
-    #     pred9 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150906.npy')
-    #     pred10 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150914.npy')
-    #     pred11 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150922.npy')
-    #     pred12 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150930.npy')
-    #     #pred_mean_ts(pred9, pred10, pred11, pred12, plotname=region+'_201509')
-    #      
-    #     plotname = region+'_201306'
-    #     print plotname
-    #     validate_prediction(pred1, ndvi_path, plotname=plotname+'02')
-    #     validate_prediction(pred2, ndvi_path, plotname=plotname+'10')
-    #     validate_prediction(pred3, ndvi_path, plotname=plotname+'18')
-    #     validate_prediction(pred4, ndvi_path, plotname=plotname+'26')
-    #      
-    #     plotname = region+'_201508'
-    #     print plotname
-    #     validate_prediction(pred5, ndvi_path, plotname=plotname+'05')
-    #     validate_prediction(pred6, ndvi_path, plotname=plotname+'13')
-    #     validate_prediction(pred7, ndvi_path, plotname=plotname+'21')
-    #     validate_prediction(pred8, ndvi_path, plotname=plotname+'29')
-    #      
-    #     plotname = region+'_201509'
-    #     print plotname
-    #     validate_prediction(pred9, ndvi_path, plotname=plotname+'06')
-    #     validate_prediction(pred10, ndvi_path, plotname=plotname+'14')
-    #     validate_prediction(pred11, ndvi_path, plotname=plotname+'22')
-    #     validate_prediction(pred12, ndvi_path, plotname=plotname+'30')
-    #===========================================================================
+    for region in regions:
+        ndvi_path = 'E:\\poets\\DATA\\'+region+'_0.1_daily.nc'
+         
+        pred1 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130602.npy')
+        pred2 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130610.npy')
+        pred3 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130618.npy')
+        pred4 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20130626.npy')
+        #pred_mean_ts(pred1, pred2, pred3, pred4, plotname=plotname)
+          
+        pred5 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150805.npy')
+        pred6 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150813.npy')
+        pred7 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150821.npy')
+        pred8 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150829.npy')
+        #pred_mean_ts(pred5, pred6, pred7, pred8, plotname=region+'_201508')
+          
+        pred9 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150906.npy')
+        pred10 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150914.npy')
+        pred11 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150922.npy')
+        pred12 = np.load('C:\\Users\\i.pfeil\\Desktop\\veg_prediction\\02_results\\'+region+'_20150930.npy')
+        #pred_mean_ts(pred9, pred10, pred11, pred12, plotname=region+'_201509')
+        pred_mean_all(pred1, pred2, pred3, pred4,
+                      pred5, pred6, pred7, pred8,
+                      pred9, pred10, pred11, pred12, plotname=region)
+          
+        #=======================================================================
+        # plotname = region+'_201306'
+        # print plotname
+        # validate_prediction(pred1, ndvi_path, plotname=plotname+'02')
+        # validate_prediction(pred2, ndvi_path, plotname=plotname+'10')
+        # validate_prediction(pred3, ndvi_path, plotname=plotname+'18')
+        # validate_prediction(pred4, ndvi_path, plotname=plotname+'26')
+        #   
+        # plotname = region+'_201508'
+        # print plotname
+        # validate_prediction(pred5, ndvi_path, plotname=plotname+'05')
+        # validate_prediction(pred6, ndvi_path, plotname=plotname+'13')
+        # validate_prediction(pred7, ndvi_path, plotname=plotname+'21')
+        # validate_prediction(pred8, ndvi_path, plotname=plotname+'29')
+        #   
+        # plotname = region+'_201509'
+        # print plotname
+        # validate_prediction(pred9, ndvi_path, plotname=plotname+'06')
+        # validate_prediction(pred10, ndvi_path, plotname=plotname+'14')
+        # validate_prediction(pred11, ndvi_path, plotname=plotname+'22')
+        # validate_prediction(pred12, ndvi_path, plotname=plotname+'30')
+        #=======================================================================
     
     
     print 'done', datetime.now()

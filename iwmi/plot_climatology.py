@@ -61,8 +61,12 @@ swi_clima = swi_df.groupby([swi_df.index.month]).mean()
 swi_resc = (swi_clima - swi_clima.min()) / (swi_clima.max() - swi_clima.min()) * 100
 vi_resc = (vi_clima - vi_clima.min()) / (vi_clima.max() - vi_clima.min()) * 100
 
-ax = vi_resc.plot()
-swi_resc.plot(ax=ax)
+print swi_resc
+print vi_resc
+
+ax = swi_resc.plot()
+vi_resc.plot(ax=ax)
+
 plt.title('SWI and NDVI climatology - Jalna (MH)', fontsize=20)
 plt.xticks(range(1,13), ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 
             'Sep', 'Oct', 'Nov', 'Dec'], rotation=45, fontsize=18)

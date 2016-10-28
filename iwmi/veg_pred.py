@@ -141,7 +141,7 @@ def start_pred(paths, region, cfg, results_path,
             if not os.path.exists(kd_path+'\\'+str(lon)+'_'+str(lat)+'.npy'):
                 #print 'Calculate kd...'
                 matched_data = temp_match.matching(swi, vi)
-                kd = calc_kd(swi, vi, matched_data, sim_end=sim_end)
+                kd = calc_kd(swi, vi, matched_data, sim_end=end_date)
                 np.save(os.path.join(kd_path, str(lon)+'_'+str(lat)+'.npy'), kd)
             else:
                 pass

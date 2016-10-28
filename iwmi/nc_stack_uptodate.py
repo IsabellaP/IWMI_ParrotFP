@@ -1,9 +1,10 @@
 import os
 import shutil
+import ast
 from osgeo import gdal, osr
 from datetime import datetime
 from netCDF4 import Dataset, num2date, date2num
-from veg_pred_preprocessing import merge_nc, format_to_folder, merge_tiff, read_tiff
+from veg_pred_preprocessing import merge_nc, format_to_folder, merge_tiff, read_tiff, unzip, read_cfg
 
 
 def array_to_raster(array, lon, lat, dst_filename):
@@ -125,3 +126,31 @@ def check_tiff_stack(data_path, data_path_tif, stack_path, stack_name, variables
                 print 'Finished - Stack is up to date again'
             else:
                 print "Data stack is already up to date"
+
+if __name__ == '__main__':
+    # check and update SWI stack
+    cfg = read_cfg('config_file_daily.cfg')
+     
+    swi_zippath = cfg['swi_zippath']
+    data_path = cfg['swi_rawdata']
+    unzip(swi_zippath, data_path)
+     
+    data_path_nc = cfg['swi_path_nc']
+    nc_stack_path = cfg['swi_path']
+    swi_stack_name = cfg['swi_stack_name']
+    variables = cfg['swi_variables'].split()
+    datestr = ast.literal_eval(cfg['swi_datestr'])
+     
+    check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
+                variables, datestr)
+     
+    # check and update VI stack
+    data_path = cfg['vi_rawdata']
+    data_path_nc = cfg['vi_path_nc']
+    nc_stack_path = cfg['vi_path']
+    swi_stack_name = cfg['vi_stack_name']
+    variables = cfg['vi_variables']
+    datestr = ast.literal_eval(cfg['vi_datestr'])
+     
+    check_tiff_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
+                     variables, datestr)
