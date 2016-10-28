@@ -2,7 +2,7 @@ import os
 import shutil
 import ast
 from osgeo import gdal, osr
-from datetime import datetime
+from datetime import datetime, timedelta
 from netCDF4 import Dataset, num2date, date2num
 from veg_pred_preprocessing import merge_nc, format_to_folder, merge_tiff, read_tiff, unzip, read_cfg
 
@@ -108,6 +108,16 @@ def check_tiff_stack(data_path, data_path_tif, stack_path, stack_name, variables
             nc_all_dates = num2date(nctime, units=unit_temps, calendar=cal_temps)
             nc_all_dates_str = [datetime.strftime(date, "%Y%m%d") for date in nc_all_dates]
             folder_all_dates = os.listdir(data_path)
+            
+            for fname in folder_all_dates:
+                if fname[9] == '_':
+                    year = fname[5:9]
+                    doy = fname[10:13]
+                    date = datetime(int(year), 1, 1) + timedelta(int(doy) - 1)
+                    f_new = 'NDVI_'+str(year)+str(date.month).zfill(2)+str(date.day).zfill(2)+'.tif'
+                    os.rename(os.path.join(data_path, fname), os.path.join(data_path, f_new))
+            
+            folder_all_dates = os.listdir(data_path)
             folder_all_dates_str = [date[datestr['year'][0]:datestr['day'][1]] for date in folder_all_dates]
             s = set(nc_all_dates_str)
             dates_to_append_str = [x for x in folder_all_dates_str if x not in s]
@@ -134,13 +144,13 @@ if __name__ == '__main__':
     swi_zippath = cfg['swi_zippath']
     data_path = cfg['swi_rawdata']
     unzip(swi_zippath, data_path)
-     
+      
     data_path_nc = cfg['swi_path_nc']
     nc_stack_path = cfg['swi_path']
     swi_stack_name = cfg['swi_stack_name']
     variables = cfg['swi_variables'].split()
     datestr = ast.literal_eval(cfg['swi_datestr'])
-     
+      
     check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
                 variables, datestr)
      
