@@ -41,7 +41,7 @@ def check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, variable
         print "Create new netcdf stack of data"
         if not os.path.exists(data_path_nc):
             os.makedirs(data_path_nc)
-        format_to_folder(data_path, '.nc', data_path_nc)
+        #format_to_folder(data_path, '.nc', data_path_nc)
         merge_nc(data_path_nc, nc_stack_path, swi_stack_name, variables, datestr)
         print "Finished"
         shutil.rmtree(data_path_nc)
@@ -64,7 +64,7 @@ def check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, variable
 
             if dates_to_append:
                 print 'Append new data to stack'
-                for idx, date_folder in enumerate(dates_to_append_str):
+                for idx, date_folder in enumerate(sorted(dates_to_append_str)):
                     path_to_nc = os.path.join(data_path, date_folder)
                     nc_date = os.listdir(path_to_nc)[0]
                     print date_folder
@@ -72,9 +72,13 @@ def check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, variable
                         data_single = {}
                         for var in variables:
                             data_single[var] = ncfile_single.variables[var][:]
-                            ncfile[var][nc_all_dates.size+idx, 
-                                        :data_single[var].shape[0], :] = \
-                                        data_single[var]
+                            if data_single[var].shape[0] <= ncfile[var].shape[0]:
+                                ncfile[var][nc_all_dates.size+idx, 
+                                            :data_single[var].shape[0], :] = \
+                                            data_single[var]
+                            else:
+                                ncfile[var][nc_all_dates.size+idx, :, :] = \
+                                            data_single[var][:ncfile[var].shape[0], :]
 
                     numdate = date2num(dates_to_append[idx], units=unit_temps, calendar=cal_temps)
                     ncfile.variables['time'][nc_all_dates.size+idx] = numdate
@@ -125,7 +129,7 @@ def check_tiff_stack(data_path, data_path_tif, stack_path, stack_name, variables
 
             if dates_to_append:
                 print 'Append new data to stack'
-                for idx, date_str in enumerate(dates_to_append_str):
+                for idx, date_str in enumerate(sorted(dates_to_append_str)):
                     tif_name = 'NDVI_'+date_str+'.tif'
                     print tif_name
                     data_single = read_tiff(data_path, tif_name, lonlat=False)
@@ -154,13 +158,15 @@ if __name__ == '__main__':
     check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
                 variables, datestr)
      
-    # check and update VI stack
-    data_path = cfg['vi_rawdata']
-    data_path_nc = cfg['vi_path_nc']
-    nc_stack_path = cfg['vi_path']
-    swi_stack_name = cfg['vi_stack_name']
-    variables = cfg['vi_variables']
-    datestr = ast.literal_eval(cfg['vi_datestr'])
-     
-    check_tiff_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
-                     variables, datestr)
+    #===========================================================================
+    # # check and update VI stack
+    # data_path = cfg['vi_rawdata']
+    # data_path_nc = cfg['vi_path_nc']
+    # nc_stack_path = cfg['vi_path']
+    # swi_stack_name = cfg['vi_stack_name']
+    # variables = cfg['vi_variables']
+    # datestr = ast.literal_eval(cfg['vi_datestr'])
+    #  
+    # check_tiff_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
+    #                  variables, datestr)
+    #===========================================================================
