@@ -6,6 +6,10 @@ from readers import read_cfg
 import ast
 import numpy as np
 from datetime import datetime
+from simon import get_SWI_grid_mask
+import sys
+
+modules = sys.modules.keys()
 
 cfg = read_cfg('config_file_10daily.cfg')
 
@@ -33,6 +37,10 @@ lat_min, lat_max, lon_min, lon_max = get_lonlat_district(district)
 # calculate SWADI
 SWADI, anomalies, lon, lat = drought_index(stack_input_path, t_value, lat_min, lat_max, lon_min, lon_max)
 
+# Get mask from SWI grid
+mask = get_SWI_grid_mask(lat_min, lat_max, lon_min, lon_max)
+mask_ind = np.where(mask.flatten() == False)
+
 # Get days
 all_days = SWADI.index.date
 date_idx = np.where((all_days >= start_date) & (all_days <= end_date))[0]
@@ -45,7 +53,7 @@ x_size = lon_u.size
 y_size = lat_u.size
 
 # Calculate SWADI distribution for TS representation
-SWADI_dist = create_SWADI_dist(stack_input_path, lat_min, lat_max, lon_min, lon_max, df=SWADI)
+SWADI_dist = create_SWADI_dist(stack_input_path, 'SWI_040', lat_min, lat_max, lon_min, lon_max, df=SWADI)
 
 # Plot Time Series of SWADI
 ax = SWADI_dist.plot.area(figsize=[30, 5], alpha=0.4, color='gyr')
@@ -69,15 +77,20 @@ if not os.path.exists(out_path_anom):
 # Writing selected dates to GTiff
 for day in days:
     # SWADI
-    filename_path_SWADI = os.path.join(out_path_tiff, day.replace('-', '_') + '.tiff')
-    arr = SWADI.loc[day].values
-    arr = np.reshape(map(int, arr), [y_size, x_size])
-    array_to_raster(arr, lon_u, lat_u, filename_path_SWADI)
+    filename_path_SWADI = os.path.join(out_path_tiff, day.replace('-', '_') + '.tif')
+    swadi = SWADI.loc[day].values
+    arr_nan_swadi = (np.zeros_like(mask) - 99).flatten()
+    arr_nan_swadi[mask_ind] = swadi
+    swadi_to_tiff = arr_nan_swadi.reshape([y_size, x_size])
+    array_to_raster(swadi_to_tiff, lon_u, lat_u, filename_path_SWADI)
 
     # Anomalies
-    filename_path_anom = os.path.join(out_path_anom, day.replace('-', '_') + '.tiff')
-    arr = anomalies.loc[day].values
-    arr = np.reshape(map(int, arr), [y_size, x_size])
-    array_to_raster(arr, lon_u, lat_u, filename_path_anom)
+    filename_path_anom = os.path.join(out_path_anom, day.replace('-', '_') + '.tif')
+    anom = anomalies.loc[day].values
+    arr_nan_anom = (np.zeros_like(mask) - 99).flatten()
+    arr_nan_anom.dtype = np.float32
+    arr_nan_anom[mask_ind] = anom
+    anom_to_tiff = arr_nan_anom.reshape([y_size, x_size])
+    array_to_raster(anom_to_tiff, lon_u, lat_u, filename_path_anom)
 
 pass

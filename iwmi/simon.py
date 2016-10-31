@@ -62,7 +62,11 @@ def get_SWI_grid_mask(lat_min, lat_max, lon_min, lon_max):
         lat = ncfile.variables['lat'][:]
         lat_idx = np.where((lat >= lat_min) & (lat <= lat_max))[0]
         lon_idx = np.where((lon >= lon_min) & (lon <= lon_max))[0]
-        mask = (ncfile.variables["SWI_010"][lat_idx, lon_idx]).mask
+        data = (ncfile.variables["SWI_010"][lat_idx, lon_idx])
+        if np.ma.is_masked(data):
+            mask = (ncfile.variables["SWI_010"][lat_idx, lon_idx]).mask
+        else:
+            mask = np.zeros(data.shape, dtype=bool)
 
     return mask
 
@@ -151,12 +155,14 @@ def anomaly(df):
     group = df.groupby([df.index.month, df.index.day])
     m = {}
     df_anomaly = df.copy()
+    clima = df.copy()
     for key, _ in group:
         m[key] = group.get_group(key).mean()
 
     for i in range(0, len(df_anomaly)):
         val = m[(df_anomaly.index[i].month, df_anomaly.index[i].day)]
         df_anomaly.iloc[i] = df_anomaly.iloc[i] - val
+        clima.iloc[i] = val
 
     col_str = df.columns[0] + ' Anomaly'
     df_anomaly.columns = [col_str]

@@ -6,8 +6,6 @@ from datetime import datetime
 from pygrids.warp5 import DGGv21CPv20
 from rsdata.WARP.interface import WARP
 from warp_data.interface import init_grid
-import matplotlib.pyplot as plt
-import ast
 import ConfigParser
 
 

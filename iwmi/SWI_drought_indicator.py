@@ -36,9 +36,6 @@ def drought_index(swi_path, param, lat_min, lat_max, lon_min, lon_max):
         dataframe = pd.concat([dataframe, df], axis=1)
         anomalies = pd.concat([anomalies, anom], axis=1)
 
-        if ind % 500 == 0:
-            print ind
-
     return dataframe, anomalies, lon, lat
 
 def set_thresholds(data):
@@ -88,9 +85,9 @@ def discrete_cmap(N, base_cmap=None):
     """Create an N-bin discrete colormap from the specified input map"""
     return plt.cm.get_cmap(base_cmap, N)
 
-def plot_Drought_indices(df_d, lon_d, lat_d, imd_anom, lon_imd, lat_imd):
+def plot_Drought_indices(df_d, lon_d, lat_d, imd_anom, lon_imd, lat_imd, lat_min, lat_max, lon_min, lon_max):
 
-    lc_mask = read_mask(15.604600000000119, 22.03099899999995, 72.65069500000004, 80.89215899999999)    # 19.204, 21, 74, 76.5754
+    lc_mask = read_mask(lat_min, lat_max, lon_min, lon_max)    # 19.204, 21, 74, 76.5754
     mask = lc_mask.data.flatten()
     mask[np.where(mask != 1)] = 0
     mask_ind = np.where(mask == 1)
@@ -101,24 +98,22 @@ def plot_Drought_indices(df_d, lon_d, lat_d, imd_anom, lon_imd, lat_imd):
         date = pd.to_datetime(str(date)).strftime('%Y-%m-%d')
         date_before = pd.to_datetime(str(dates[i])).strftime('%Y-%m-%d')
         gs = gridspec.GridSpec(4, 4)
-        fig = plt.figure(figsize=[30, 25])
+        fig = plt.figure(figsize=[25, 20])
         plt.suptitle(date, fontsize=30)
         ax1 = fig.add_subplot(gs[0:2, 0:2])
-        map = Basemap(projection='cyl', llcrnrlon=72, llcrnrlat=15, urcrnrlat=22.6,
-                      urcrnrlon=81)
-        #map = Basemap(projection='cyl', llcrnrlon=73, llcrnrlat=18.204, urcrnrlat=22,
-        #              urcrnrlon=77.5754)
+        map = Basemap(projection='cyl', llcrnrlon=lon_min, llcrnrlat=lat_min, urcrnrlat=lat_max,
+                      urcrnrlon=lon_max)
         map.drawmapboundary()
         map.drawcountries()
         cmap = cls.ListedColormap(['#A20000', '#DE0000', '#E5E618', '#47A917', '#30740C'], name='from_list', N=None)
         map.scatter(np.array(lon_d).flatten()[mask_ind], np.array(lat_d).flatten()[mask_ind],
                     c=df_d.loc[date].values.flatten()[mask_ind], edgecolor='None',
-                    marker='s', s=52, vmin=1, vmax=5, cmap=discrete_cmap(6, cmap)) # s=125 for Maharashtra
+                    marker='s', s=16, vmin=1, vmax=5, cmap=discrete_cmap(6, cmap))
         map.readshapefile(os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
                                      '0_IWMI_DATASETS', 'shapefiles', 'IND_adm',
                                      'IND_adm1'), 'IN.MH.JN', linewidth=0.4)
-        map.readshapefile('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\shapefiles\\Maharashtra', 'IN.MH',
-                          linewidth=3)
+        map.readshapefile('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\shapefiles\\Study_area', 'IN.MH',
+                          linewidth=2)
         cbar=plt.colorbar(ticks=range(6))
         cbar.ax.tick_params(labelsize=22)
 
@@ -127,23 +122,23 @@ def plot_Drought_indices(df_d, lon_d, lat_d, imd_anom, lon_imd, lat_imd):
 
         #IDSI
         data, lon, lat, _ = read_img('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\IDSI_stack.nc', 'IDSI',
-                                     15.605, 22.031, 72.651, 80.893, timestamp=datetime.strptime(date, '%Y-%m-%d'))
+                                     lat_min, lat_max, lon_min, lon_max, timestamp=datetime.strptime(date, '%Y-%m-%d'))
         lons, lats = np.meshgrid(lon, lat)
         data[np.where(data == 0)] = 8
         ax2 = fig.add_subplot(gs[0:2, 2:4])
-        map = Basemap(projection='cyl', llcrnrlon=72, llcrnrlat=15, urcrnrlat=22.6,
-                      urcrnrlon=81)
+        map = Basemap(projection='cyl', llcrnrlon=lon_min, llcrnrlat=lat_min, urcrnrlat=lat_max,
+                      urcrnrlon=lon_max)
         map.drawmapboundary()
         map.drawcountries()
 
         cmap = cls.ListedColormap(['#A20000', '#DE0000', '#E19800', '#FBD37F', '#E5E618', '#47A917', '#30740C', 'w', 'b'], name='from_list', N=None)
         map.scatter(np.array(lons).flatten(), np.array(lats).flatten(), c=np.array(data).flatten(),
-                            edgecolor='None', marker='s', s=0.1, vmin=1, vmax=9, cmap=discrete_cmap(10, cmap)) # s=0.3 for Maharashtra
+                            edgecolor='None', marker='s', s=0.03, vmin=1, vmax=9, cmap=discrete_cmap(10, cmap))
         map.readshapefile(os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
                                      '0_IWMI_DATASETS', 'shapefiles', 'IND_adm',
                                      'IND_adm1'), 'IN.MH.JN', linewidth=0.4)
-        map.readshapefile('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\shapefiles\\Maharashtra', 'IN.MH',
-                          linewidth=3)
+        map.readshapefile('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\shapefiles\\Study_area', 'IN.MH',
+                          linewidth=2)
         cbar=plt.colorbar(ticks=range(10))
         cbar.ax.tick_params(labelsize=22)
 
@@ -151,47 +146,47 @@ def plot_Drought_indices(df_d, lon_d, lat_d, imd_anom, lon_imd, lat_imd):
         plt.title("IDSI", fontsize=26)
 
         # Rainfall
-        ax3 = fig.add_subplot(gs[2:4, 2:4])
-        map = Basemap(projection='cyl', llcrnrlon=72, llcrnrlat=15, urcrnrlat=22.6,
-                      urcrnrlon=81)
+        ax3 = fig.add_subplot(gs[2:4, 0:2])
+        map = Basemap(projection='cyl', llcrnrlon=lon_min, llcrnrlat=lat_min, urcrnrlat=lat_max,
+                      urcrnrlon=lon_max)
         map.drawmapboundary()
         map.drawcountries()
 
         cmap = 'RdBu'
         map.scatter(np.array(lon_imd).flatten()[mask_ind], np.array(lat_imd).flatten()[mask_ind],
                     c=imd_anom.loc[date_before].values.flatten()[mask_ind], edgecolor='None',
-                    marker='s', s=52, vmin=-8, vmax=8, cmap=cmap)
+                    marker='s', s=16, vmin=-8, vmax=8, cmap=cmap)
         map.readshapefile(os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
                                      '0_IWMI_DATASETS', 'shapefiles', 'IND_adm',
                                      'IND_adm1'), 'IN.MH.JN', linewidth=0.4)
-        map.readshapefile('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\shapefiles\\Maharashtra', 'IN.MH',
-                          linewidth=3)
+        map.readshapefile('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\shapefiles\\Study_area', 'IN.MH',
+                          linewidth=2)
         cbar = plt.colorbar()
         cbar.ax.tick_params(labelsize=22)
 
         plt.title("Rainfall Anomalies " + date_before, fontsize=26)
 
-        ax4 = fig.add_subplot(gs[2:4, 0:2])
-        map = Basemap(projection='cyl', llcrnrlon=72, llcrnrlat=15, urcrnrlat=22.6,
-                      urcrnrlon=81)
+        ax4 = fig.add_subplot(gs[2:4, 2:4])
+        map = Basemap(projection='cyl', llcrnrlon=lon_min, llcrnrlat=lat_min, urcrnrlat=lat_max,
+                      urcrnrlon=lon_max)
         map.drawmapboundary()
         map.drawcountries()
 
         cmap = 'RdBu'
         map.scatter(np.array(lon_imd).flatten()[mask_ind], np.array(lat_imd).flatten()[mask_ind],
                     c=imd_anom.loc[date].values.flatten()[mask_ind], edgecolor='None',
-                    marker='s', s=52, vmin=-8, vmax=8, cmap=cmap)
+                    marker='s', s=16, vmin=-8, vmax=8, cmap=cmap)
         map.readshapefile(os.path.join('C:\\', 'Users', 's.hochstoger', 'Desktop',
                                      '0_IWMI_DATASETS', 'shapefiles', 'IND_adm',
                                      'IND_adm1'), 'IN.MH.JN', linewidth=0.4)
-        map.readshapefile('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\shapefiles\\Maharashtra', 'IN.MH',
-                          linewidth=3)
+        map.readshapefile('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\shapefiles\\Study_area', 'IN.MH',
+                          linewidth=2)
         cbar=plt.colorbar()
         cbar.ax.tick_params(labelsize=22)
 
         plt.title("Rainfall Anomalies " + date, fontsize=26)
-        plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\SWI_IDSI_Drought\\SWI_IDSI_RF_Drought_MA_' + date + '.png', dpi=250,
-                     bbox_inches='tight', pad_inches=0.3)
+        plt.savefig('C:\\Users\\s.hochstoger\\Desktop\\Plots\\SWI_IDSI_Drought\\SWI_IDSI_RF_Drought_MA_' + date + '.png',
+                    dpi=250, bbox_inches='tight', pad_inches=0.3)
         plt.close()
 
 def IMD_RF_10d_anomalies(lat_min, lat_max, lon_min, lon_max):
@@ -260,12 +255,26 @@ def get_lonlat_district(string):
 if __name__ == '__main__':
 
     swi_path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_stack.nc'
-    # lat_min, lat_max, lon_min, lon_max = get_lonlat_district('IN.GJ.AM') #IN.RJ.BP - IN.MH.JN
-    #
-    # lc_mask = read_mask(lat_min, lat_max, lon_min, lon_max)
-    # mask = lc_mask.data.flatten()
-    # mask[np.where(mask != 1)] = 0
-    # mask_ind = np.where(mask == 1)
+#    swi_path = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\Dataset_stacks\\SWI_daily_stack.nc'
+    # swi_kundasale = read_ts(swi_path, params=['SWI_001'], lon=80.694805, lat=7.290307, start_date=datetime(2016, 9, 23),
+    #                         end_date=datetime(2016, 10, 24))
+    # swi_mahaill = read_ts(swi_path, params=['SWI_001'], lon=80.468046, lat=8.110454, start_date=datetime(2016, 9, 23),
+    #                         end_date=datetime(2016, 10, 24))
+    # ax = swi_kundasale.plot(figsize=[10, 5])
+    # plt.ylim([0, 100])
+    # plt.grid()
+    # plt.title('Soil Moisture Kundsale', fontsize=17)
+    # plt.ylabel("Degree of Saturation [%]", fontsize=15)
+    # ax.legend().set_visible(False)
+    # ax.set_xticks(swi_kundasale.index[3::7])
+
+
+    lat_min, lat_max, lon_min, lon_max = get_lonlat_district('IN.MH.JN') #IN.RJ.BP - IN.GJ.AM
+
+    lc_mask = read_mask(14.7148, 29.3655, 68.25, 81.8419)
+    mask = lc_mask.data.flatten()
+    mask[np.where(mask != 1)] = 0
+    mask_ind = np.where(mask == 1)
 
 
     #swi001 = read_ts_area(swi_path, 'SWI_001', lat_min, lat_max, lon_min, lon_max)
@@ -295,56 +304,37 @@ if __name__ == '__main__':
     #            corr, delimiter=",")
     # ========================================
 
-    # IDSI = create_drought_dist(lat_min, lat_max, lon_min, lon_max)
-    # IDSI.drought = IDSI.drought * (-1)
-    # SWADI = create_SWADI_dist(swi_path, 'SWI_040', lat_min, lat_max, lon_min, lon_max)
-    # rf_anom, rf = IMD_RF_10d_anomalies(lat_min, lat_max, lon_min, lon_max)
+    IDSI = create_drought_dist(lat_min, lat_max, lon_min, lon_max)
+    IDSI.drought = IDSI.drought * (-1)
+    #SWADI = create_SWADI_dist(swi_path, 'SWI_040', lat_min, lat_max, lon_min, lon_max)
+    rf_anom, rf = IMD_RF_10d_anomalies(lat_min, lat_max, lon_min, lon_max)
 
-    # rf_anom_mean = pd.DataFrame(rf_anom.mean(axis=1)/(rf_anom.mean(axis=1).max()))
-    # rf_anom_mean = rf_anom_mean.loc['2007-07-01':'2015-06-26']
-    # rf_mean = rf.mean(axis=1).loc['2007-07-01':'2015-06-26']
-    # rf_anom_mean.columns = ['Rainfall Anomalies']
-    # rf_mean.columns = ['Rainfall']
+    rf_anom_mean = pd.DataFrame(rf_anom.mean(axis=1)/(rf_anom.mean(axis=1).max()))
+    rf_anom_mean = rf_anom_mean.loc['2007-07-01':'2015-06-26']
+    rf_mean = rf.mean(axis=1).loc['2007-07-01':'2015-06-26']
+    rf_anom_mean.columns = ['Rainfall Anomalies']
+    rf_mean.columns = ['Rainfall']
 
 
     #=========== load csv files for whole MA =========
     # IDSI = create_drought_dist(lat_min, lat_max, lon_min, lon_max)
     # IDSI.drought = IDSI.drought * (-1)
     #
-    SWADI = pd.read_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\test_drougth_all.csv")
-    SWADI.index = SWADI.iloc[:, 0].values
-    SWADI = SWADI.drop('Unnamed: 0', 1)
-    SWADI.index = pd.to_datetime(SWADI.index)
-
-    mask = get_SWI_grid_mask(14.7148, 29.3655, 68.15, 81.8419)
-    mask_ind = np.where(mask.flatten() == False)
-    arr_nan = (np.zeros_like(mask) - 99).flatten()
-
-    lonlat = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\test_drought_lon_lat_all.csv')
-    lon_d = lonlat.lon.values
-    lat_d = lonlat.lat.values
-    lon_u = np.unique(lon_d)
-    lat_u = np.unique(lat_d)
-    x_size = lon_u.size
-    y_size = lat_u.size
-    arr = SWADI.loc['2013-02-21'].values
-    arr_nan[mask_ind] = arr
-    arr = arr_nan.reshape([y_size, x_size])
-    filename_path_SWADI = 'C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\TEST_FOR_SOFTWARE\\out\\studyarea2.tiff'
-    array_to_raster(arr, lon_u, lat_u, filename_path_SWADI)
+    # SWADI = pd.read_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\SWADI_study_area_10050309.csv")
+    # SWADI.index = SWADI.iloc[:, 0].values
+    # SWADI = SWADI.drop('Unnamed: 0', 1)
+    # SWADI.index = pd.to_datetime(SWADI.index)
     # SWADI_mask = SWADI.iloc[:, mask_ind[0]]
+    #
+    # lonlat = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\SWADI_lonlat_study_area_10050309.csv')
     #
     # SWADI = create_SWADI_dist(lat_min, lat_max, lon_min, lon_max, df=SWADI_mask)
     #
-    # rf_anom = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\All_Maharashtra\\IMD_rainfall_anomaly_Maharashtra.csv')
+    # rf_anom = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\IMD_anom_all.csv')
     # rf_anom.index = rf_anom.iloc[:, 0].values
     # rf_anom = rf_anom.drop('Unnamed: 0', 1)
     # rf_anom.index = pd.to_datetime(rf_anom.index)
-    # rf = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\All_Maharashtra\\IMD_rainfall_Maharashtra.csv')
-    # rf.index = rf.iloc[:, 0].values
-    # rf = rf.drop('Unnamed: 0', 1)
-    # rf.index = pd.to_datetime(rf.index)
-
+    #
     # plot_Drought_indices(SWADI, lon_d, lat_d, rf_anom, lon_d, lat_d)
     # =========================================
 
@@ -427,37 +417,37 @@ if __name__ == '__main__':
 
     # ===================== plot IDSI, SWADI and RF anomalies in one plot
     #SWI drought
-    df_d, anomalies, lon_d, lat_d = drought_index(swi_path, 'SWI_040', 14.7148, 29.3655, 68.15, 81.8419)
-    df_d.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\SWADI_study_area_10050309.csv")
-    anomalies.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\anomalies_study_area.csv")
-
-    d = {'lon': lon_d, 'lat': lat_d}
-    lonlat = pd.DataFrame(data=d)
-    lonlat.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\SWADI_lonlat_study_area_10050309.csv")
-
-    # df_d = pd.read_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\test_drougth_all.csv")
-    # df_d.index = df_d.iloc[:, 0].values
-    # df_d = df_d.drop('Unnamed: 0', 1)
-    # lonlat = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\test_drought_lon_lat_all.csv')
-    # lon_d = lonlat.lon.values
-    # lat_d = lonlat.lat.values
-    # del_ind = np.where(lon_d != 68.15)
-    # lon_d = lon_d[del_ind]
-    # lat_d = lat_d[del_ind]
-    # df_d = df_d.iloc[:, del_ind[0]]
+    # df_d, anomalies, lon_d, lat_d = drought_index(swi_path, 'SWI_040', 14.7148, 29.3655, 68.15, 81.8419)
+    # df_d.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\SWADI_study_area_10050309.csv")
+    # anomalies.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\anomalies_study_area.csv")
     #
-    # imd_anom = pd.read_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\IMD_anom_all.csv")
-    # imd_anom.index = imd_anom.iloc[:, 0].values
-    # imd_anom = imd_anom.drop('Unnamed: 0', 1)
-    # imd_lonlat = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\IMD_lon_lat_all.csv')
-    # lon_imd = imd_lonlat.lon.values
-    # lat_imd = imd_lonlat.lat.values
-    # del_ind = np.where(lon_imd != 68.15)
-    # lon_imd = lon_imd[del_ind]
-    # lat_imd = lat_imd[del_ind]
-    # imd_anom = imd_anom.iloc[:, del_ind[0]]
-    #
-    # plot_Drought_indices(df_d, lon_d, lat_d, imd_anom, lon_imd, lat_imd)
+    # d = {'lon': lon_d, 'lat': lat_d}
+    # lonlat = pd.DataFrame(data=d)
+    # lonlat.to_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\SWADI_lonlat_study_area_10050309.csv")
+
+    df_d = pd.read_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\SWADI_study_area_10050309.csv")
+    df_d.index = df_d.iloc[:, 0].values
+    df_d = df_d.drop('Unnamed: 0', 1)
+    lonlat = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\SWADI_lonlat_study_area_10050309.csv')
+    lon_d = lonlat.lon.values
+    lat_d = lonlat.lat.values
+    del_ind = np.where(lon_d != 68.15)
+    lon_d = lon_d[del_ind]
+    lat_d = lat_d[del_ind]
+    df_d = df_d.iloc[:, del_ind[0]]
+
+    imd_anom = pd.read_csv("C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\IMD_anom_all.csv")
+    imd_anom.index = imd_anom.iloc[:, 0].values
+    imd_anom = imd_anom.drop('Unnamed: 0', 1)
+    imd_lonlat = pd.read_csv('C:\\Users\\s.hochstoger\\Desktop\\0_IWMI_DATASETS\\SWADI_data\\IMD_lon_lat_all.csv')
+    lon_imd = imd_lonlat.lon.values
+    lat_imd = imd_lonlat.lat.values
+    del_ind = np.where(lon_imd != 68.15)
+    lon_imd = lon_imd[del_ind]
+    lat_imd = lat_imd[del_ind]
+    imd_anom = imd_anom.iloc[:, del_ind[0]]
+
+    plot_Drought_indices(df_d, lon_d, lat_d, imd_anom, lon_imd, lat_imd, 14.7148, 29.3655, 68.25, 81.8419)
     # ========================================================
 
     pass

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from pytesmo.temporal_matching import matching
 from pytesmo.scaling import scale
 import pytesmo.metrics as metrics
-from iwmi.data_analysis import rescale_peng
+#from iwmi.data_analysis import rescale_peng
 
 
 def read_cfg(cfg_file, include_default=True, only_default=False):
@@ -72,10 +72,10 @@ def get_FP_data(username, password, client_id, client_secret, plant,
 
     req = requests.get('https://apiflowerpower.parrot.com/user/v1/authenticate',
                        data={'grant_type': 'password',
-                             'username': username,
-                             'password': password,
-                             'client_id': client_id,
-                             'client_secret': client_secret,
+                             'username': 'iwmi.sadms@gmail.com',
+                             'password': 'iwmi_sm',
+                             'client_id': 'iwmi.sadms@gmail.com',
+                             'client_secret': 'IQBh58Q4TUEtBjQNGxSc5X3D1mvi8IlSwDJzqtY00YEdc7Rz',
                             })
     response = req.json()
     
@@ -334,9 +334,9 @@ if __name__ == '__main__':
     #hoal_df = read_HOAL('/media/sf_D/0_IWMI_DATASETS/HOAL/')
     
     # IWMI paths
-    cfg_path = 'C:\\Users\\i.pfeil\\Documents\\0_IWMI_DATASETS\\FP_credentials.txt'
-    ascat_ssm = pd.DataFrame.from_csv('C:\\Users\\i.pfeil\\Documents\\'+
-                                      '0_IWMI_DATASETS\\ascat_ssm.csv')
+    cfg_path =  'C:\\Users\\s.hochstoger\\AppData\\Roaming\\Skype\\My Skype Received Files\\FP_credentials.txt'
+    #ascat_ssm = pd.DataFrame.from_csv('C:\\Users\\i.pfeil\\Documents\\'+
+    #                                  '0_IWMI_DATASETS\\ascat_ssm.csv')
     #hoal_raw = read_HOAL_raw('C:\\Users\\i.pfeil\\Documents\\'+
     #                         '0_IWMI_DATASETS\\HOAL_raw\\')
     #hoal_df = read_HOAL('C:\\Users\\i.pfeil\\Documents\\'+
