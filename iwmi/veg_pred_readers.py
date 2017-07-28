@@ -1,7 +1,9 @@
+import os
 import numpy as np
 import pandas as pd
 from netCDF4 import Dataset, num2date
 from datetime import datetime
+from scipy.io.matlab.miobase import arr_dtype_number
 
 
 def read_ts(path, params=['SWI_020'], lon=80.5, lat=6.81,
@@ -132,3 +134,16 @@ def read_ts_area(path, param, lat_min, lat_max, lon_min, lon_max, t=1,
 def find_nearest(array, element):
     idx = (np.abs(array - element)).argmin()
     return array[idx]
+
+
+def read_npy_results(fname):
+    arr = np.load(fname)
+    print arr[:,2].mean()
+
+if __name__ == '__main__':
+    fpath = '/media/ipfeil/2TB_GEO/TEST_veg_pred_170426_juni/02_results/'
+    
+    for fname in os.listdir(fpath):
+        print fname
+        read_npy_results(os.path.join(fpath, fname))
+    

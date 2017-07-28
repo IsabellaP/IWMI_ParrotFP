@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from netCDF4 import Dataset, num2date
 import matplotlib.pyplot as plt
 import pytesmo.temporal_matching as temp_match
-from poets.shape.shapes import Shape
 
 from veg_pred_readers import read_ts_area
 from nc_stack_uptodate import array_to_raster
@@ -45,17 +44,14 @@ def start_pred(paths, region, cfg, results_path,
         Last full year for which data is available
     """
     
+    print 'last_year: '+str(last_year)
+    
     # get bounding box for district
-    shp_path = cfg['shp_path']
-    if shp_path == 'None':
-        latlon = cfg['latlon'].split()
-        lat_min = float(latlon[0])
-        lat_max = float(latlon[1])
-        lon_min = float(latlon[2])
-        lon_max = float(latlon[3])
-    else:
-        shpfile = Shape(region, shapefile=shp_path)
-        lon_min, lat_min, lon_max, lat_max = shpfile.bbox
+    latlon = cfg['latlon'].split()
+    lat_min = float(latlon[0])
+    lat_max = float(latlon[1])
+    lon_min = float(latlon[2])
+    lon_max = float(latlon[3])
         
     start_date = datetime(2007,1,1)
     
@@ -122,7 +118,46 @@ def start_pred(paths, region, cfg, results_path,
             if len(np.where(~np.isnan(vi_df[vi_str]))[0]) == 0:
                 print 'Time series is NaN'
                 continue
-             
+            
+            #===================================================================
+            # # plot SWI/VI-stack
+            # idx_out = np.where((swi_df.index.month==2)&(swi_df.index.day==29))
+            # swi_df = swi_df.drop(swi_df.index[idx_out])
+            # swi_stack_data = np.array([swi_df['2007'].values.flatten(), 
+            #                         swi_df['2008'].values.flatten(), 
+            #                         swi_df['2009'].values.flatten(), 
+            #                         swi_df['2010'].values.flatten(), 
+            #                         swi_df['2011'].values.flatten(), 
+            #                         swi_df['2012'].values.flatten(), 
+            #                         swi_df['2013'].values.flatten(), 
+            #                         swi_df['2014'].values.flatten()])
+            # swi_stack = pd.DataFrame(np.transpose(swi_stack_data), 
+            #                     columns=['2007', '2008', '2009', '2010', 
+            #                             '2011', '2012', '2013', '2014'], 
+            #                     index=swi_df['2007'].index)
+            # #swi_stack.plot()
+            # #plt.grid()
+            # #plt.show()
+            # 
+            # idx_out = np.where((vi_df.index.month==2)&(vi_df.index.day==29))
+            # vi_df = vi_df.drop(vi_df.index[idx_out])
+            # vi_stack_data = np.array([vi_df['2007'].values.flatten(), 
+            #                         vi_df['2008'].values.flatten(), 
+            #                         vi_df['2009'].values.flatten(), 
+            #                         vi_df['2010'].values.flatten(), 
+            #                         vi_df['2011'].values.flatten(), 
+            #                         vi_df['2012'].values.flatten(), 
+            #                         vi_df['2013'].values.flatten(), 
+            #                         vi_df['2014'].values.flatten()])
+            # vi_stack = pd.DataFrame(np.transpose(vi_stack_data), 
+            #                     columns=['2007', '2008', '2009', '2010', 
+            #                             '2011', '2012', '2013', '2014'], 
+            #                     index=vi_df['2007'].index)
+            # #vi_stack.plot()
+            # #plt.grid()
+            # #plt.show()
+            #===================================================================
+            
             # apply minmax-scaling to datasets
             vi_min = np.nanmin(vi_df)
             vi_max = np.nanmax(vi_df)
@@ -135,10 +170,10 @@ def start_pred(paths, region, cfg, results_path,
              
             # calculate and save kd-parameters
             sim_end = str(last_year).zfill(4)
-            kd_path = (results_path+ '01_kd_param_'+sim_end+'_'+region+'\\')
+            kd_path = (results_path+ '01_kd_param_'+sim_end+'_'+region+'/')
             if not os.path.exists(kd_path):
                 os.mkdir(kd_path)
-            if not os.path.exists(kd_path+'\\'+str(lon)+'_'+str(lat)+'.npy'):
+            if not os.path.exists(kd_path+'/'+str(lon)+'_'+str(lat)+'.npy'):
                 #print 'Calculate kd...'
                 matched_data = temp_match.matching(swi, vi)
                 kd = calc_kd(swi, vi, matched_data, sim_end=end_date)
@@ -150,7 +185,7 @@ def start_pred(paths, region, cfg, results_path,
             # predict VI values
             try:
                 kd = np.load(results_path+ '01_kd_param_'+sim_end+'_'+
-                             region+'\\'+str(lon)+'_'+str(lat)+'.npy').item()
+                             region+'/'+str(lon)+'_'+str(lat)+'.npy').item()
             except IOError:
                 #print 'No kd file'
                 continue
@@ -168,8 +203,8 @@ def start_pred(paths, region, cfg, results_path,
                                                     results4=results4)
      
     # save results of prediction
-    if not os.path.exists(results_path+'02_results\\'):
-        os.mkdir(results_path+'02_results\\')
+    if not os.path.exists(results_path+'02_results'):
+        os.mkdir(results_path+'02_results')
     ts1 = np.unique(np.array(results1)[:,3])[0]
     ts1_str = str(ts1.year).zfill(4)+str(ts1.month).zfill(2)+str(ts1.day).zfill(2)
     ts2 = np.unique(np.array(results2)[:,3])[0]
@@ -178,13 +213,13 @@ def start_pred(paths, region, cfg, results_path,
     ts3_str = str(ts3.year).zfill(4)+str(ts3.month).zfill(2)+str(ts3.day).zfill(2)
     ts4 = np.unique(np.array(results4)[:,3])[0]
     ts4_str = str(ts4.year).zfill(4)+str(ts4.month).zfill(2)+str(ts4.day).zfill(2)
-    np.save(results_path + '02_results\\'+str(region)+'_'+ts1_str+'.npy', 
+    np.save(results_path + '02_results/'+str(region)+'_'+ts1_str+'.npy', 
             results1)
-    np.save(results_path + '02_results\\'+str(region)+'_'+ts2_str+'.npy', 
+    np.save(results_path + '02_results/'+str(region)+'_'+ts2_str+'.npy', 
             results2)
-    np.save(results_path + '02_results\\'+str(region)+'_'+ts3_str+'.npy', 
+    np.save(results_path + '02_results/'+str(region)+'_'+ts3_str+'.npy', 
             results3)
-    np.save(results_path + '02_results\\'+str(region)+'_'+ts4_str+'.npy', 
+    np.save(results_path + '02_results/'+str(region)+'_'+ts4_str+'.npy', 
             results4)
     
     # create average prediction time series for region
@@ -520,7 +555,7 @@ if __name__ == '__main__':
     # check nc-stack availability, unzip files if necessary
     swi_zippath = cfg['swi_zippath']
     data_path = cfg['swi_rawdata']
-    unzip(swi_zippath, data_path)
+    #unzip(swi_zippath, data_path)
     
     data_path = cfg['swi_rawdata']
     data_path_nc = cfg['swi_path_nc']
@@ -529,8 +564,8 @@ if __name__ == '__main__':
     variables = cfg['swi_variables'].split()
     datestr = ast.literal_eval(cfg['swi_datestr'])
     
-    check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
-                variables, datestr)
+    #check_stack(data_path, data_path_nc, nc_stack_path, swi_stack_name, 
+    #            variables, datestr)
     
     # check and update VI stack
     data_path = cfg['vi_rawdata']

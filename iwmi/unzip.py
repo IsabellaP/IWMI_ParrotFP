@@ -8,6 +8,11 @@ import gdal
 from zipfile import BadZipfile
 
 
+def find_nearest(array, element):
+    idx = (np.abs(array - element)).argmin()
+    return array[idx], idx
+
+
 def unzip(path_in, path_out):
     """ Unzips folders from path_in to path_out 
     """
@@ -29,6 +34,9 @@ def format_to_folder(root, formatstr, out_path):
     the files to out_path
     """
     
+    if not os.path.exists(out_path):
+        os.mkdir(out_path)
+    
     for path, _, files in os.walk(root):
         for name in files:
             if formatstr in name:
@@ -36,15 +44,37 @@ def format_to_folder(root, formatstr, out_path):
                                 os.path.join(out_path, name))
                 
 
-def merge_nc(path, new_path, new_ncf, variables, datestr):
+def merge_nc(path, new_path, new_ncf, variables, datestr, lat_min=None,
+             lat_max=None, lon_min=None, lon_max=None, formatfolder=True):
 
     # read one ncfile to get lon, lat settings
-    with Dataset(os.path.join(path, os.listdir(path)[0]), 'r') as ncfile:
-        lons = ncfile.variables['lon'][:]
-        lats = ncfile.variables['lat'][:]
+    if formatfolder:
+        with Dataset(os.path.join(path, os.listdir(path)[0]), 'r') as ncfile:
+            lons = ncfile.variables['lon'][:]
+            lats = ncfile.variables['lat'][:]
+    else:
+        count = 0
+        formatstr = '.nc'
+        for subpath, _, files in os.walk(path):
+            for name in files:
+                if formatstr in name:
+                    if count > 0:
+                        break
+                    with Dataset(os.path.join(subpath, os.listdir(subpath)[0]), 'r') as ncfile:
+                        lons = ncfile.variables['lon'][:]
+                        lats = ncfile.variables['lat'][:]
+                    count += 1
+                    
     
-    with Dataset(os.path.join(new_path, new_ncf), 'w') as ncfile:
-        
+    if lat_min and lat_max and lon_min and lon_max:
+        lon_min, idx1 = find_nearest(lons, lon_min)
+        lon_max, idx2 = find_nearest(lons, lon_max)
+        lat_min, idx3 = find_nearest(lats, lat_min)
+        lat_max, idx4 = find_nearest(lats, lat_max)
+        lat_size = np.abs(idx3-idx4)
+        lon_size = np.abs(idx1-idx2)
+    
+    with Dataset(os.path.join(new_path, new_ncf), 'w') as ncfile:     
         print 'Writing data to netCDF...'
 
         start_date = datetime(year=2000, month=1, day=1)
@@ -57,8 +87,12 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
         times.calendar = 'standard'
 
         # Define lat and lon as dim and var
-        arrlat = lats
-        arrlon = lons
+        if lat_min and lat_max and lon_min and lon_max:
+            arrlat = lats[idx4:idx3]
+            arrlon = lons[idx1:idx2]
+        else:
+            arrlat = lats
+            arrlon = lons
         latsize = len(arrlat)
         lonsize = len(arrlon)
 
@@ -93,16 +127,17 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
                                               fill_value=255, zlib=True,
                                               complevel=4)
 
-        for idx, ncf in enumerate(sorted(os.listdir(path))):
-            print idx
-            with Dataset(os.path.join(path, ncf), 'r') as ncfile_single:
-                data_single = {}
-                for var in variables:
-                    if idx >= 1461:
-                        data_single[var] = ncfile_single.variables[var][:-1,:]
-                    else:
-                        data_single[var] = ncfile_single.variables[var][:]
-                    data[var][idx,:,:] = data_single[var]
+        if formatfolder:
+            for idx, ncf in enumerate(sorted(os.listdir(path))):
+                print idx, ncf
+                with Dataset(os.path.join(path, ncf), 'r') as ncfile_single:
+                    data_single = {}
+                    for var in variables:
+                        if lat_min and lat_max and lon_min and lon_max:
+                            data_single[var] = ncfile_single.variables[var][0, idx4:idx3, idx1:idx2]
+                        else:
+                            data_single[var] = ncfile_single.variables[var][:]
+                        data[var][idx,:,:] = data_single[var]
 
             year = int(ncf[datestr['year'][0]:datestr['year'][1]])
             month = int(ncf[datestr['month'][0]:datestr['month'][1]])
@@ -110,7 +145,31 @@ def merge_nc(path, new_path, new_ncf, variables, datestr):
             numdate = date2num(datetime(year,month,day), units=times.units,
                                calendar=times.calendar)
             times[idx] = numdate     
-        
+
+        else:
+            idx = 0
+            for subpath, dirs, files in os.walk(path):
+                dirs.sort()
+                for ncf in sorted(files):
+                    if formatstr in ncf:
+                        print idx, ncf
+                        with Dataset(os.path.join(subpath, ncf), 'r') as ncfile_single:
+                            data_single = {}
+                            for var in variables:
+                                if lat_min and lat_max and lon_min and lon_max:
+                                    data_single[var] = ncfile_single.variables[var][idx4:idx3, idx1:idx2]
+                                else:
+                                    data_single[var] = ncfile_single.variables[var][:]
+                                data[var][idx,:,:] = data_single[var]
+
+                            year = int(ncf[datestr['year'][0]:datestr['year'][1]])
+                            month = int(ncf[datestr['month'][0]:datestr['month'][1]])
+                            day = int(ncf[datestr['day'][0]:datestr['day'][1]])
+                            numdate = date2num(datetime(year,month,day), units=times.units,
+                                               calendar=times.calendar)
+                            times[idx] = numdate
+                            
+                        idx += 1
     print 'Finished.'
     
     
@@ -236,19 +295,43 @@ def merge_tiff(path, new_path, new_tiff, variable, datestr):
 
 if __name__ == '__main__':
        
-    path = "E:\\_DATA\\SWI_daily\\"
-    path_uz = "E:\\_DATA\\SWI_daily_unzipped\\"
+    path = "/data/Copernicus/LAI300/all/"
+    #path_uz = "/data/Copernicus/SWI/Kenya_or_Eth2/uz"
     #unzip(path, path_uz)
-    
-    new_path = "E:\\_DATA\\"
-    format_path = "E:\\_DATA\\SWI_daily_nc\\"
-    #format_to_folder(path_uz, '.nc', format_path)
-        
-    new_ncf = 'SWI_daily_stack.nc'
-    variables = ['SWI_001', 'SWI_005', 'SWI_010', 'SWI_015', 
-                 'SWI_020', 'SWI_040', 'SWI_060', 'SWI_100']  
-    datestr = {'year': [14,18], 'month': [18,20], 'day': [20,22]}
-      
-    merge_nc(format_path, new_path, new_ncf, variables, datestr)
+
+    new_path = "/data/Copernicus/LAI300/stack/"
+    #format_path = "/data/Copernicus/LAI300/nc/"
+    #format_to_folder(path, '.nc', format_path)
+
+    country = 'Austria'
+    new_ncf = 'LAI300_stack_AT_2.nc'
+    #variables = ['SWI_001', 'SWI_005', 'SWI_010', 'SWI_015',
+    #             'SWI_020', 'SWI_040', 'SWI_060', 'SWI_100']
+    variables = ['LAI','QFLAG']#, 'TIME_GRID', 'crs']
+    #datestr = {'year': [16,20], 'month': [20,22], 'day': [22,24]} #SWI
+    datestr = {'year': [13,17], 'month': [17,19], 'day': [19,21]} #LAI
+ 
+    if country == 'Kenya':
+        latlon = [-4.6696, 4.6224, 33.9072, 41.9051]
+    elif country == 'DRC':
+        latlon = [-13.4580, 5.3806, 12.2145, 31.3027]
+    if country == 'Ethiopia':
+        latlon = [3.4066, 14.8836, 32.9917, 47.9882]
+    if country == 'Colombia':
+        latlon = [-4.2368, 12.5902, -81.7201, -66.8704]
+        #latlon=[3.087138, 3.795309, -76.735399, -76.019913]
+    if country == 'Austria':
+        latlon = [46.4074, 49.0187, 9.5335, 17.1663]
+    if country == 'India':
+        latlon = [6.7458, 35.5056, 68.1442, 97.3805]
+    print new_ncf
+    lat_min=latlon[0]
+    lat_max=latlon[1]
+    lon_min=latlon[2]
+    lon_max=latlon[3]
+    # formatfolder false should work as long as data is not zipped
+    merge_nc(path, new_path, new_ncf, variables, datestr,
+             lat_min=lat_min, lat_max=lat_max, lon_min=lon_min, lon_max=lon_max,
+             formatfolder=False)
     
     print "done"

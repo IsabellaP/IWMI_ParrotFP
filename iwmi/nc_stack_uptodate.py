@@ -22,9 +22,17 @@ def array_to_raster(array, lon, lat, dst_filename):
 
     dataset.SetGeoTransform((x_min, PIXEL_SIZE,  0, y_max, 0, -PIXEL_SIZE))
 
-    srs = osr.SpatialReference()
-    srs.ImportFromEPSG(4326)
-    dataset.SetProjection(srs.ExportToWkt())
+    #===========================================================================
+    # srs = osr.SpatialReference()
+    # srs.ImportFromEPSG(4326)
+    # dataset.SetProjection(srs.ExportToWkt())
+    #===========================================================================
+    
+    wkt2 = ('GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",'
+            '6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],'
+            'PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,'
+            'AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]')
+    dataset.SetProjection(wkt2)
     dataset.GetRasterBand(1).WriteArray(array)
     dataset.GetRasterBand(1).SetNoDataValue(-99)
     dataset.FlushCache()  # Write to disk.
